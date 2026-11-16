@@ -318,7 +318,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             
             // Appliquer un échelon de luminosité
             let deltaB: Double = (initialLamp > 75.0) ? -20.0 : 20.0
-            let testLamp = max(10.0, min(100.0, initialLamp + deltaB))
+            let testLamp = max(0.0, min(100.0, initialLamp + deltaB))
             self.applyLampBrightness?(testLamp)
             
             // Attente réponse de la lampe et du capteur
@@ -439,7 +439,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         // Consigne désirée = f(targetComfort, externalLux)
         let deficit = targetComfort - externalLux
         var desiredLamp = targetComfort + (deficit * 0.8)
-        desiredLamp = max(10.0, min(100.0, desiredLamp))
+        desiredLamp = max(0.0, min(100.0, desiredLamp))
         
         let delta = desiredLamp - currentLamp
         
@@ -453,7 +453,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         
         // 2. Limitation de rampe (Slew Rate Limiter) : variation progressive de 2.5% max
         let step = max(-maxStepPerCycle, min(maxStepPerCycle, delta))
-        let nextBrightness = max(10.0, min(100.0, currentLamp + step))
+        let nextBrightness = max(0.0, min(100.0, currentLamp + step))
         
         DispatchQueue.main.async {
             self.statusMessage = (delta > 0) ? "Compensation (+)..." : "Compensation (-)..."

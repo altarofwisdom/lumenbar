@@ -219,7 +219,7 @@ struct LumenBarMenuView: View {
                                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                                     .foregroundColor(.secondary)
                             }
-                            Slider(value: $lamp.autoLight.targetComfort, in: 20...100)
+                            Slider(value: $lamp.autoLight.targetComfort, in: 0...100)
                         }
                     }
                     .padding(8)
