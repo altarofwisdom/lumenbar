@@ -11,6 +11,10 @@
 
 LumenBar provides instant, direct local control (no Zigbee bridge, no cloud gateway, no external hub) for smart light fixtures sold under the **Inspire** and **Lexman** brands (Adeo / Leroy Merlin group, notably the *Inspire Gdansk* `ZBEK-27` LED ceiling panel) as well as any device implementing the proprietary GATT service `0000a101-1115-1000-0001-617573746f6d`.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="LumenBar macOS Menu Bar Interface" width="340">
+</p>
+
 ---
 
 ## Features

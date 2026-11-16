@@ -11,6 +11,10 @@
 
 LumenBar permet de piloter instantanément et localement en direct (sans pont Zigbee, sans passerelle Cloud, sans hub externe) les luminaires connectés commercialisés sous les marques **Inspire** et **Lexman** (groupe Adeo / Leroy Merlin, notamment le plafonnier LED *Inspire Gdansk* `ZBEK-27`) ainsi que tout équipement exploitant le service GATT propriétaire `0000a101-1115-1000-0001-617573746f6d`.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Interface macOS Menu Bar de LumenBar" width="340">
+</p>
+
 ---
 
 ## Fonctionnalités
