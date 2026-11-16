@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LumenBarMenuView: View {
     @ObservedObject var lamp: LampController
+    @ObservedObject private var locManager = LocalizationManager.shared
     @State private var manualUUIDInput: String = ""
     @State private var showManualInput: Bool = false
     
@@ -35,7 +36,7 @@ struct LumenBarMenuView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("LumenBar")
+                    Text(L10n.appTitle)
                         .font(.system(size: 13, weight: .bold))
                     
                     HStack(spacing: 5) {
@@ -59,7 +60,7 @@ struct LumenBarMenuView: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Gérer ou oublier le luminaire")
+                .help(L10n.manageHelp)
                 
                 // Bouton Power Principal
                 Button(action: {
@@ -70,7 +71,7 @@ struct LumenBarMenuView: View {
                         .foregroundColor(lamp.isOn ? .green : .secondary.opacity(0.4))
                 }
                 .buttonStyle(.plain)
-                .help(lamp.isOn ? "Éteindre le luminaire" : "Allumer le luminaire")
+                .help(lamp.isOn ? L10n.turnOffHelp : L10n.turnOnHelp)
             }
             .padding(.bottom, 2)
             
@@ -79,7 +80,7 @@ struct LumenBarMenuView: View {
             // Variateur Luminosité
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Label("Luminosité", systemImage: "sun.max.fill")
+                    Label(L10n.brightness, systemImage: "sun.max.fill")
                         .font(.system(size: 11, weight: .semibold))
                     Spacer()
                     Text("\(Int(lamp.brightness)) %")
@@ -130,7 +131,7 @@ struct LumenBarMenuView: View {
             // Température Blanc CCT (2700K - 6500K)
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Label("Blanc CCT", systemImage: "thermometer.sun.fill")
+                    Label(L10n.cctWhite, systemImage: "thermometer.sun.fill")
                         .font(.system(size: 11, weight: .semibold))
                     Spacer()
                     Text("\(Int(lamp.temperature)) K (\(lamp.temperatureLabel))")
@@ -152,17 +153,17 @@ struct LumenBarMenuView: View {
                 )
                 
                 HStack(spacing: 6) {
-                    Button("Chaud 2700K") {
+                    Button(L10n.warmPreset) {
                         lamp.setTemperature(2700, immediate: true)
                     }
                     .buttonStyle(PresetPillStyle(isSelected: Int(round(lamp.temperature)) <= 3100))
                     
-                    Button("Neutre 4000K") {
+                    Button(L10n.neutralPreset) {
                         lamp.setTemperature(4000, immediate: true)
                     }
                     .buttonStyle(PresetPillStyle(isSelected: Int(round(lamp.temperature)) > 3100 && Int(round(lamp.temperature)) < 5500))
                     
-                    Button("Froid 6500K") {
+                    Button(L10n.coldPreset) {
                         lamp.setTemperature(6500, immediate: true)
                     }
                     .buttonStyle(PresetPillStyle(isSelected: Int(round(lamp.temperature)) >= 5500))
@@ -174,7 +175,7 @@ struct LumenBarMenuView: View {
             // Couleurs & Roue Chromatique
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Label("Couleur & Teinte", systemImage: "paintpalette.fill")
+                    Label(L10n.colorHue, systemImage: "paintpalette.fill")
                         .font(.system(size: 11, weight: .semibold))
                     Spacer()
                     Text("\(Int(lamp.hue))°")
@@ -193,10 +194,10 @@ struct LumenBarMenuView: View {
                                 .overlay(
                                     Circle()
                                         .stroke(Color.primary.opacity(0.3), lineWidth: 1)
-                                )
+                                 )
                         }
                         .buttonStyle(.plain)
-                        .help(p.name)
+                        .help(L10n.colorName(p.name))
                     }
                 }
                 
@@ -223,7 +224,7 @@ struct LumenBarMenuView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
-                        Text("Actualiser")
+                        Text(L10n.refresh)
                     }
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
@@ -237,13 +238,13 @@ struct LumenBarMenuView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "power")
-                        Text("Quitter LumenBar")
+                        Text(L10n.quitApp)
                     }
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.red.opacity(0.85))
                 }
                 .buttonStyle(.plain)
-                .help("Éteint la lampe et quitte l'application")
+                .help(L10n.quitHelp)
             }
             .padding(.top, 2)
         }
@@ -258,7 +259,7 @@ struct LumenBarMenuView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.accentColor)
                 
-                Text(lamp.configuredAddress == nil ? "Association du Luminaire" : "Gestion du Dispositif")
+                Text(lamp.configuredAddress == nil ? L10n.pairLuminaire : L10n.deviceManagement)
                     .font(.system(size: 13, weight: .bold))
                 
                 Spacer()
@@ -269,7 +270,7 @@ struct LumenBarMenuView: View {
                     }) {
                         HStack(spacing: 3) {
                             Image(systemName: "chevron.left")
-                            Text("Retour")
+                            Text(L10n.back)
                         }
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.accentColor)
@@ -285,7 +286,7 @@ struct LumenBarMenuView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Luminaire associé")
+                            Text(L10n.pairedLuminaire)
                                 .font(.system(size: 11, weight: .semibold))
                             Text(addr)
                                 .font(.system(size: 9, weight: .regular, design: .monospaced))
@@ -307,7 +308,7 @@ struct LumenBarMenuView: View {
                         HStack {
                             Spacer()
                             Image(systemName: "trash")
-                            Text("Oublier ce luminaire")
+                            Text(L10n.forgetLuminaire)
                             Spacer()
                         }
                         .font(.system(size: 11, weight: .medium))
@@ -322,10 +323,10 @@ struct LumenBarMenuView: View {
                 Divider()
             } else {
                 VStack(spacing: 4) {
-                    Text("Aucun luminaire configuré")
+                    Text(L10n.noLuminaireConfigured)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.orange)
-                    Text("Lancez une recherche Bluetooth pour détecter et associer votre luminaire.")
+                    Text(L10n.scanToPairPrompt)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -336,7 +337,7 @@ struct LumenBarMenuView: View {
             // Section Recherche Bluetooth
             VStack(spacing: 8) {
                 HStack {
-                    Text("Luminaires à proximité")
+                    Text(L10n.nearbyLuminaires)
                         .font(.system(size: 11, weight: .semibold))
                     Spacer()
                     
@@ -350,7 +351,7 @@ struct LumenBarMenuView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "magnifyingglass")
-                                Text("Rechercher")
+                                Text(L10n.scanBtn)
                             }
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.accentColor)
@@ -399,7 +400,7 @@ struct LumenBarMenuView: View {
                                     
                                     Spacer()
                                     
-                                    Button("Associer") {
+                                    Button(L10n.pairBtn) {
                                         lamp.pairDevice(address: dev.address)
                                     }
                                     .font(.system(size: 10, weight: .bold))
@@ -428,7 +429,7 @@ struct LumenBarMenuView: View {
                     showManualInput.toggle()
                 }) {
                     HStack {
-                        Text("Saisie manuelle d'une adresse UUID")
+                        Text(L10n.manualUUIDEntry)
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
                         Spacer()
@@ -445,7 +446,7 @@ struct LumenBarMenuView: View {
                             .font(.system(size: 9, design: .monospaced))
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         
-                        Button("Valider") {
+                        Button(L10n.validateBtn) {
                             lamp.pairDevice(address: manualUUIDInput)
                             manualUUIDInput = ""
                         }
@@ -457,13 +458,30 @@ struct LumenBarMenuView: View {
             
             Divider()
             
+            // Choix de la langue
+            HStack {
+                Label(L10n.languageLabel, systemImage: "globe")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Picker("", selection: $locManager.selectedLanguage) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .font(.system(size: 10))
+            }
+            
+            Divider()
+            
             // Pied : Quitter
             HStack {
                 Spacer()
                 Button(action: {
                     lamp.quitApp()
                 }) {
-                    Text("Quitter LumenBar")
+                    Text(L10n.quitApp)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.red.opacity(0.85))
                 }
@@ -505,11 +523,12 @@ struct PresetPillStyle: ButtonStyle {
 struct AutoLightSectionView: View {
     @ObservedObject var autoLight: AutoLightEngine
     @ObservedObject var lamp: LampController
+    @ObservedObject private var locManager = LocalizationManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Label("AutoLight (Webcam)", systemImage: "sparkles")
+                Label(L10n.autoLightTitle, systemImage: "sparkles")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(autoLight.isEnabled ? .yellow : .primary)
                 
@@ -525,18 +544,18 @@ struct AutoLightSectionView: View {
                 VStack(spacing: 6) {
                     // Choix de la webcam (physique / virtuelle)
                     HStack {
-                        Label("Webcam", systemImage: "video.fill")
+                        Label(L10n.webcamSource, systemImage: "video.fill")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.secondary)
                         Spacer()
                         if autoLight.availableCameras.isEmpty {
-                            Text("Aucune webcam")
+                            Text(L10n.noWebcam)
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
                         } else {
                             Picker("", selection: $autoLight.selectedCameraID) {
                                 ForEach(autoLight.availableCameras) { cam in
-                                    Text(cam.isVirtual ? "\(cam.name) (Virtuelle)" : cam.name)
+                                    Text(cam.isVirtual ? "\(cam.name) (\(L10n.virtualTag))" : cam.name)
                                         .tag(cam.id)
                                 }
                             }
@@ -569,7 +588,7 @@ struct AutoLightSectionView: View {
                                 } else {
                                     Image(systemName: "slider.horizontal.below.rectangle")
                                 }
-                                Text(autoLight.isCalibrating ? "Mesure..." : "Étalonner")
+                                Text(autoLight.isCalibrating ? L10n.measuring : L10n.calibrate)
                             }
                             .font(.system(size: 9, weight: .medium))
                             .padding(.horizontal, 6)
@@ -579,13 +598,13 @@ struct AutoLightSectionView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(autoLight.isCalibrating)
-                        .help("Mesure le couplage optique entre la lampe et la webcam pour éviter les boucles")
+                        .help(L10n.calibrateHelp)
                     }
                     
                     // Jauge de lumière ambiante externe estimée
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
-                            Text("Lumière ambiante détectée")
+                            Text(L10n.ambientDetected)
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -601,7 +620,7 @@ struct AutoLightSectionView: View {
                     // Curseur de confort souhaité
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
-                            Text("Ambiance souhaitée")
+                            Text(L10n.targetComfort)
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -614,7 +633,7 @@ struct AutoLightSectionView: View {
                     
                     // Extinction & rallumage automatique
                     HStack {
-                        Text("Éteindre/rallumer auto")
+                        Text(L10n.autoPowerToggle)
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
                         Spacer()
@@ -623,7 +642,7 @@ struct AutoLightSectionView: View {
                             .scaleEffect(0.65)
                             .labelsHidden()
                     }
-                    .help("Éteint automatiquement la lampe si la lumière du jour suffit, et la rallume dès que la pièce s'assombrit")
+                    .help(L10n.autoPowerHelp)
                 }
                 .padding(8)
                 .background(Color.primary.opacity(0.04))

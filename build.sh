@@ -6,6 +6,7 @@ APP_DIR="$HOME/Applications/LumenBar.app"
 
 echo "🔨 Compilation de LumenBar.app..."
 swiftc -O -parse-as-library \
+    "$SCRIPT_DIR/Sources/Localization.swift" \
     "$SCRIPT_DIR/Sources/AutoLightEngine.swift" \
     "$SCRIPT_DIR/Sources/LampController.swift" \
     "$SCRIPT_DIR/Sources/LumenBarMenuView.swift" \

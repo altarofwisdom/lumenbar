@@ -56,11 +56,11 @@ class LampController: ObservableObject {
     
     var temperatureLabel: String {
         if temperature < 3400 {
-            return "Chaud"
+            return L10n.warm
         } else if temperature < 5000 {
-            return "Neutre"
+            return L10n.neutral
         } else {
-            return "Froid"
+            return L10n.cold
         }
     }
     
@@ -96,9 +96,33 @@ class LampController: ObservableObject {
                 self?.setBrightness(newB, immediate: true)
             }
         }
+        autoLight.setLampStateDirect = { [weak self] on, brightness in
+            guard let self = self else { return }
+            if on {
+                _ = self.sendSocketCommand("on")
+                let pct = Int(round(brightness))
+                _ = self.sendSocketCommand("dim \(pct)")
+            } else {
+                _ = self.sendSocketCommand("off")
+            }
+            DispatchQueue.main.async {
+                self.isOn = on
+                if on {
+                    self.brightness = brightness
+                }
+            }
+        }
         
         // Propagation des changements AutoLight pour SwiftUI
         autoLight.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+            
+        // Écoute des changements de langue
+        LocalizationManager.shared.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
@@ -109,7 +133,7 @@ class LampController: ObservableObject {
             ensureDaemonRunning()
         } else {
             showDeviceManager = true
-            statusText = "Non configuré"
+            statusText = L10n.notConfigured
         }
     }
     
@@ -153,7 +177,7 @@ class LampController: ObservableObject {
             self.showDeviceManager = false
             self.discoveredDevices.removeAll()
             self.scanMessage = nil
-            self.statusText = "Connexion..."
+            self.statusText = L10n.connecting
             self.ensureDaemonRunning()
         }
     }
@@ -169,7 +193,7 @@ class LampController: ObservableObject {
         DispatchQueue.main.async {
             self.configuredAddress = nil
             self.isConnected = false
-            self.statusText = "Non configuré"
+            self.statusText = L10n.notConfigured
             self.showDeviceManager = true
             self.scanForDevices()
         }
@@ -178,7 +202,7 @@ class LampController: ObservableObject {
     func scanForDevices() {
         guard !isScanning else { return }
         isScanning = true
-        scanMessage = "Recherche Bluetooth en cours (6s)..."
+        scanMessage = L10n.scanningMsg
         discoveredDevices.removeAll()
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -209,7 +233,7 @@ class LampController: ObservableObject {
                        let list = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
                         var parsed: [DiscoveredDevice] = []
                         for item in list {
-                            let name = item["name"] as? String ?? "Inconnu"
+                            let name = item["name"] as? String ?? L10n.unknown
                             let addr = item["address"] as? String ?? ""
                             let rssi = item["rssi"] as? Int ?? -99
                             let compat = item["is_compatible"] as? Bool ?? false
@@ -221,9 +245,9 @@ class LampController: ObservableObject {
                             self.discoveredDevices = parsed
                             self.isScanning = false
                             if parsed.isEmpty {
-                                self.scanMessage = "Aucun luminaire détecté. Vérifiez que la lampe est sous tension et déconnectée du smartphone."
+                                self.scanMessage = L10n.noDevicesFound
                             } else {
-                                self.scanMessage = "\(parsed.count) équipement(s) trouvé(s)"
+                                self.scanMessage = L10n.devicesFound(count: parsed.count)
                             }
                         }
                         return
@@ -231,7 +255,7 @@ class LampController: ObservableObject {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.scanMessage = "Erreur pendant le scan: \(error.localizedDescription)"
+                    self.scanMessage = "Erreur: \(error.localizedDescription)"
                     self.isScanning = false
                 }
                 return
@@ -239,7 +263,7 @@ class LampController: ObservableObject {
             
             DispatchQueue.main.async {
                 self.isScanning = false
-                self.scanMessage = "Aucun dispositif trouvé."
+                self.scanMessage = L10n.noDevicesFound
             }
         }
     }
@@ -282,7 +306,7 @@ class LampController: ObservableObject {
         guard let addr = configuredAddress, !addr.isEmpty else {
             DispatchQueue.main.async {
                 self.isConnected = false
-                self.statusText = "Non configuré"
+                self.statusText = L10n.notConfigured
                 self.showDeviceManager = true
             }
             return
@@ -296,14 +320,14 @@ class LampController: ObservableObject {
                 if pong.contains("READY") {
                     DispatchQueue.main.async {
                         self.isConnected = true
-                        self.statusText = "Connecté"
+                        self.statusText = L10n.connected
                     }
                     self.fetchStatus()
                     return
                 } else if pong.contains("PONG") {
                     DispatchQueue.main.async {
                         self.isConnected = false
-                        self.statusText = "Connexion Bluetooth..."
+                        self.statusText = L10n.connecting
                     }
                 }
             }
@@ -318,7 +342,7 @@ class LampController: ObservableObject {
             
             DispatchQueue.main.async {
                 self.isConnected = false
-                self.statusText = "Démarrage du démon..."
+                self.statusText = L10n.startingDaemon
             }
             
             let python = self.resolvePythonPath()
@@ -358,21 +382,21 @@ class LampController: ObservableObject {
                     if pong.contains("READY") {
                         DispatchQueue.main.async {
                             self.isConnected = true
-                            self.statusText = "Connecté"
+                            self.statusText = L10n.connected
                         }
                         self.fetchStatus()
                         return
                     } else if pong.contains("PONG") {
                         DispatchQueue.main.async {
                             self.isConnected = false
-                            self.statusText = "Connexion Bluetooth..."
+                            self.statusText = L10n.connecting
                         }
                     }
                 }
             }
             
             DispatchQueue.main.async {
-                self.statusText = "Lampe hors de portée ou occupée"
+                self.statusText = L10n.outOfRange
             }
         }
     }
@@ -388,17 +412,17 @@ class LampController: ObservableObject {
                         if p.contains("READY") {
                             if !self.isConnected {
                                 self.isConnected = true
-                                self.statusText = "Connecté"
+                                self.statusText = L10n.connected
                                 self.fetchStatus()
                             }
                         } else if p.contains("CONNECTING") {
                             self.isConnected = false
-                            self.statusText = "Connexion Bluetooth..."
+                            self.statusText = L10n.connecting
                         }
                     } else {
                         if self.isConnected {
                             self.isConnected = false
-                            self.statusText = "Reconnexion..."
+                            self.statusText = L10n.reconnecting
                             self.ensureDaemonRunning()
                         }
                     }
@@ -531,7 +555,7 @@ class LampController: ObservableObject {
                         if let h = json["hue"] as? Double { self.hue = h }
                         else if let h = json["hue"] as? Int { self.hue = Double(h) }
                         self.isConnected = true
-                        self.statusText = "Connecté"
+                        self.statusText = L10n.connected
                     }
                 }
             }
@@ -561,7 +585,8 @@ class LampController: ObservableObject {
     
     func userSetBrightness(_ val: Double, immediate: Bool = false) {
         if autoLight.isEnabled {
-            autoLight.targetComfort = min(100.0, max(0.0, autoLight.estimatedExternalLux + (autoLight.couplingAlpha * val)))
+            let delta = val - brightness
+            autoLight.targetComfort = min(100.0, max(0.0, autoLight.estimatedExternalLux + (autoLight.couplingAlpha * delta)))
         }
         setBrightness(val, immediate: immediate)
     }

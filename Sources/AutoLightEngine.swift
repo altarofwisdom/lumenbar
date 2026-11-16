@@ -50,8 +50,11 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     /// Luminance brute totale mesurée par la webcam (0% à 100%)
     @Published var rawCameraLuma: Double = 50.0
     
-    /// Coefficient de couplage optique α (part du flux de la lampe renvoyé sur la caméra)
+    /// Coefficient de couplage optique G (pente de variation % luma / % lampe)
     @Published var couplingAlpha: Double = 0.25
+    
+    /// Seuil d'éclairage minimal émis par la lampe à 1% (Low-End Trim physique)
+    @Published var minStepLuma: Double = 5.0
     
     /// État d'étalonnage en cours
     @Published var isCalibrating: Bool = false
@@ -79,6 +82,9 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     /// Envoi de la consigne de luminosité à la lampe
     var applyLampBrightness: ((Double) -> Void)?
     
+    /// Commande directe synchrone (allumage/extinction + luminosité) pour l'étalonnage
+    var setLampStateDirect: ((Bool, Double) -> Void)?
+    
     // MARK: - Capture AVFoundation
     
     private let captureSession = AVCaptureSession()
@@ -88,12 +94,16 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     private var lastSampleTimestamp: CFAbsoluteTime = 0
     private let sampleInterval: CFAbsoluteTime = 1.8 // Échantillonnage toutes les 1.8 secondes
     
+    private var recentLumaSamples: [Double] = []
+    private var latestLuma: Double = 50.0
+    private let lumaLock = NSLock()
+    
     // MARK: - Filtre & Régulation
     
     private var smoothedExternalLux: Double = 50.0
     private let emaFactor: Double = 0.80 // Filtre passe-bas (lissage sur ~8 secondes)
     private let deadband: Double = 1.5   // Seuil d'hystérésis (pas d'action si écart < 1.5%)
-    private let maxStepPerCycle: Double = 2.0 // Rampe douce de 2% max par cycle (1.8s)
+    private let maxStepPerCycle: Double = 1.0 // Rampe ultra-douce de 1% max par cycle (1.8s)
     
     private var excessLightCycleCount: Int = 0
     private let excessCyclesRequired: Int = 2 // ~3.6s de confirmation pour extinction auto
@@ -208,14 +218,13 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             }
             if let newInput = try? AVCaptureDeviceInput(device: device), self.captureSession.canAddInput(newInput) {
                 self.captureSession.addInput(newInput)
+                self.activeDevice = device
+                self.lockExposureIfPossible()
             }
             self.captureSession.commitConfiguration()
             
             DispatchQueue.main.async {
-                self.statusMessage = "Caméra : \(device.localizedName)"
-                if self.isEnabled {
-                    self.calibrateCoupling()
-                }
+                self.statusMessage = L10n.cameraSelected(name: device.localizedName)
             }
         }
     }
@@ -233,14 +242,14 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
                 DispatchQueue.main.async {
                     self?.cameraAuthorized = granted
                     if !granted {
-                        self?.statusMessage = "Accès caméra refusé"
+                        self?.statusMessage = L10n.cameraPermissionDenied
                     }
                 }
             }
         case .denied, .restricted:
             DispatchQueue.main.async {
                 self.cameraAuthorized = false
-                self.statusMessage = "Accès caméra non autorisé"
+                self.statusMessage = L10n.cameraNotAuthorized
             }
         @unknown default:
             break
@@ -257,21 +266,21 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             guard let self = self else { return }
             self.setupCaptureSession()
             self.captureSession.startRunning()
+            self.lockExposureIfPossible()
             
             DispatchQueue.main.async {
-                self.statusMessage = "AutoLight actif"
-                // Lancer un étalonnage rapide à la première activation
-                self.calibrateCoupling()
+                self.statusMessage = L10n.autoLightActive
             }
         }
     }
     
     func stop() {
         guard captureSession.isRunning else { return }
+        unlockExposureToContinuous()
         captureQueue.async { [weak self] in
             self?.captureSession.stopRunning()
             DispatchQueue.main.async {
-                self?.statusMessage = "AutoLight inactif"
+                self?.statusMessage = L10n.autoLightInactive
             }
         }
     }
@@ -297,7 +306,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         guard let validDevice = device else {
             captureSession.commitConfiguration()
             DispatchQueue.main.async {
-                self.statusMessage = "Aucune webcam détectée"
+                self.statusMessage = L10n.noWebcamDetected
             }
             return
         }
@@ -308,6 +317,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         }
         if let input = try? AVCaptureDeviceInput(device: validDevice), captureSession.canAddInput(input) {
             captureSession.addInput(input)
+            self.activeDevice = validDevice
         }
         
         // Sortie flux
@@ -323,13 +333,43 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         captureSession.commitConfiguration()
     }
     
-    // MARK: - Étalonnage automatique du couplage optique (α)
+    // MARK: - Contrôle matériel de l'exposition (Norme LBNL / IES)
+    
+    private var activeDevice: AVCaptureDevice?
+    
+    private func lockExposureIfPossible() {
+        guard let dev = activeDevice else { return }
+        do {
+            try dev.lockForConfiguration()
+            if dev.isExposureModeSupported(.locked) {
+                dev.exposureMode = .locked
+            }
+            dev.unlockForConfiguration()
+        } catch {
+            print("Failed to lock exposure: \(error)")
+        }
+    }
+    
+    private func unlockExposureToContinuous() {
+        guard let dev = activeDevice else { return }
+        do {
+            try dev.lockForConfiguration()
+            if dev.isExposureModeSupported(.continuousAutoExposure) {
+                dev.exposureMode = .continuousAutoExposure
+            }
+            dev.unlockForConfiguration()
+        } catch {
+            print("Failed to unlock exposure: \(error)")
+        }
+    }
+    
+    // MARK: - Étalonnage en Boucle Fermée (Norme LBNL / Rubinstein & IES)
     
     func calibrateCoupling() {
         guard !isCalibrating else { return }
         DispatchQueue.main.async {
             self.isCalibrating = true
-            self.statusMessage = "Étalonnage en cours..."
+            self.statusMessage = L10n.calibratingLock
         }
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -341,37 +381,88 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
                 }
             }
             
-            let initialLamp = self.getCurrentLampBrightness?() ?? 50.0
-            // Attente de stabilisation
-            Thread.sleep(forTimeInterval: 0.6)
-            let m0 = self.rawCameraLuma
+            // 0. Mémorisation de l'état initial de la lampe
+            let initialWasOn = self.getIsLampOn?() ?? true
+            let initialBrightness = self.getCurrentLampBrightness?() ?? 50.0
             
-            // Appliquer un échelon de luminosité (+25% ou -25%)
-            let deltaB: Double = (initialLamp > 75.0) ? -25.0 : 25.0
-            let testLamp = max(0.0, min(100.0, initialLamp + deltaB))
-            self.applyLampBrightness?(testLamp)
-            
-            // Attente réponse de la lampe et du capteur vidéo
+            // 1. ÉTAPE 1 : Stabilisation sous lumière ambiante réelle (écrans, autres lumières) puis verrouillage matériel
+            DispatchQueue.main.async {
+                self.statusMessage = L10n.calibratingLock
+            }
+            self.unlockExposureToContinuous()
             Thread.sleep(forTimeInterval: 1.2)
-            let m1 = self.rawCameraLuma
+            self.lockExposureIfPossible()
+            Thread.sleep(forTimeInterval: 0.3)
             
-            // Calcul du ratio couplage α = |ΔM| / |ΔB|
-            let observedDelta = abs(m1 - m0)
-            let appliedDelta = abs(testLamp - initialLamp)
-            var calculatedAlpha = (appliedDelta > 5.0) ? (observedDelta / appliedDelta) : 0.25
+            // 2. ÉTAPE 2 : Mesure de l'ambiance pure sans cette lampe (Lampe éteinte, B = 0)
+            DispatchQueue.main.async {
+                self.statusMessage = L10n.calibratingOff
+            }
+            self.setLampStateDirect?(false, 0.0)
+            let sOff = self.measureAverageLuma(settleDuration: 1.3, sampleDuration: 0.6)
             
-            // Bornage de sécurité pour α (entre 0.05 et 0.65)
-            calculatedAlpha = max(0.05, min(0.65, calculatedAlpha))
+            // 3. ÉTAPE 3 : Mesure du palier minimal réel de la lampe à 1% (Low-End Trim physique)
+            DispatchQueue.main.async {
+                self.statusMessage = L10n.calibratingMin
+            }
+            self.setLampStateDirect?(true, 1.0)
+            let sMin = self.measureAverageLuma(settleDuration: 1.3, sampleDuration: 0.6)
+            let measuredMinStep = max(0.5, sMin - sOff)
             
-            // Rétablissement de la lampe
-            self.applyLampBrightness?(initialLamp)
-            Thread.sleep(forTimeInterval: 0.4)
+            // 4. ÉTAPE 4 : Mesure de la réponse optique à 80% (Pente de variation)
+            DispatchQueue.main.async {
+                self.statusMessage = L10n.calibratingOn
+            }
+            self.setLampStateDirect?(true, 80.0)
+            let s80 = self.measureAverageLuma(settleDuration: 1.3, sampleDuration: 0.6)
+            
+            // 5. ÉTAPE 5 : Calcul de la pente de transfert G = ΔS / ΔB sur la plage utile (1% -> 80%)
+            let deltaS = s80 - sMin
+            let deltaB = 79.0
+            
+            var calculatedGain: Double
+            if deltaS > 1.0 {
+                calculatedGain = max(0.05, min(0.85, deltaS / deltaB))
+            } else {
+                calculatedGain = 0.25 // Repli sécurisé si la webcam ne reçoit pas le faisceau direct
+            }
+            
+            // 6. ÉTAPE 6 : Rétablissement propre de l'état initial
+            if initialWasOn {
+                self.setLampStateDirect?(true, initialBrightness)
+            } else {
+                self.setLampStateDirect?(false, 0.0)
+            }
+            Thread.sleep(forTimeInterval: 0.3)
             
             DispatchQueue.main.async {
-                self.couplingAlpha = calculatedAlpha
-                self.statusMessage = String(format: "Étalonné (α = %.2f)", calculatedAlpha)
+                self.minStepLuma = measuredMinStep
+                self.couplingAlpha = calculatedGain
+                self.smoothedExternalLux = sOff
+                self.estimatedExternalLux = sOff
+                self.statusMessage = L10n.calibrated(alpha: calculatedGain, minStep: measuredMinStep)
             }
         }
+    }
+    
+    private func measureAverageLuma(settleDuration: TimeInterval, sampleDuration: TimeInterval) -> Double {
+        // Attente de stabilisation de la commande BLE et du capteur vidéo
+        Thread.sleep(forTimeInterval: settleDuration)
+        
+        // Réinitialiser les échantillons pour capturer la fenêtre stable
+        lumaLock.lock()
+        recentLumaSamples.removeAll()
+        lumaLock.unlock()
+        
+        Thread.sleep(forTimeInterval: sampleDuration)
+        
+        lumaLock.lock()
+        defer { lumaLock.unlock() }
+        
+        if !recentLumaSamples.isEmpty {
+            return recentLumaSamples.reduce(0.0, +) / Double(recentLumaSamples.count)
+        }
+        return latestLuma
     }
     
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
@@ -380,49 +471,43 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         guard isEnabled else { return }
         
         let now = CFAbsoluteTimeGetCurrent()
-        let interval = isCalibrating ? 0.3 : sampleInterval
+        let interval = isCalibrating ? 0.25 : sampleInterval
         guard now - lastSampleTimestamp >= interval else { return }
         lastSampleTimestamp = now
         
-        // 1. Calcul de la luminance de la scène (0 à 100)
+        // 1. Calcul de la luminance de la scène (avec exposition verrouillée)
         let measuredLuma = computeSceneLuma(sampleBuffer: sampleBuffer)
+        
+        lumaLock.lock()
+        latestLuma = measuredLuma
+        recentLumaSamples.append(measuredLuma)
+        if recentLumaSamples.count > 15 {
+            recentLumaSamples.removeFirst()
+        }
+        lumaLock.unlock()
         
         DispatchQueue.main.async {
             self.rawCameraLuma = measuredLuma
         }
         
-        // Pendant l'étalonnage, mesurer rawCameraLuma mais ne pas réguler la lampe
+        // Pendant l'étalonnage, ne pas réguler la lampe
         guard !isCalibrating else { return }
         
-        // 2. Découplage de la contribution de la lampe (Soustraction feed-forward)
-        let currentLamp = getCurrentLampBrightness?() ?? 50.0
-        let lampContribution = currentLamp * couplingAlpha
-        let rawExternal = max(0.0, min(100.0, measuredLuma - lampContribution))
-        
-        // 3. Filtrage passe-bas (EMA) pour amortir les passages passagers
-        smoothedExternalLux = (emaFactor * smoothedExternalLux) + ((1.0 - emaFactor) * rawExternal)
+        // 2. Lissage passe-bas (EMA) de la lumière totale perçue S(t)
+        smoothedExternalLux = (emaFactor * smoothedExternalLux) + ((1.0 - emaFactor) * measuredLuma)
         
         DispatchQueue.main.async {
             self.estimatedExternalLux = self.smoothedExternalLux
         }
         
-        // 4. Régulation en boucle fermée
-        computeAndApplyAdjustment(externalLux: smoothedExternalLux, currentLamp: currentLamp)
+        // 3. Régulation en boucle fermée LBNL
+        let currentLamp = getCurrentLampBrightness?() ?? 50.0
+        computeAndApplyClosedLoop(sceneLuma: smoothedExternalLux, currentLamp: currentLamp)
     }
     
-    // MARK: - Analyse de Luminance Ultra-légère (Pixels BGRA)
+    // MARK: - Analyse de Luminance (Pixels BGRA)
     
     private func computeSceneLuma(sampleBuffer: CMSampleBuffer) -> Double {
-        // Tenter d'abord la métrique APEX BrightnessValue depuis les métadonnées EXIF si disponibles
-        if let attachments = CMCopyDictionaryOfAttachments(allocator: kCFAllocatorDefault, target: sampleBuffer, attachmentMode: kCMAttachmentMode_ShouldPropagate) as? [String: Any],
-           let exif = attachments["{Exif}"] as? [String: Any],
-           let bv = exif[kCGImagePropertyExifBrightnessValue as String] as? Double {
-            // Normalisation APEX (-5 à +12 EV) sur 0 à 100%
-            let norm = ((bv + 5.0) / 15.0) * 100.0
-            return max(0.0, min(100.0, norm))
-        }
-        
-        // Analyse directe de la matrice de pixels centrale (zone utile 50% centrale)
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return 50.0 }
         
         CVPixelBufferLockBaseAddress(imageBuffer, .readOnly)
@@ -467,17 +552,13 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         return averageLuma
     }
     
-    // MARK: - Algorithme de Régulation Douce & Extinction/Rallumage Automatique
+    // MARK: - Régulation en Boucle Fermée (Norme LBNL / Rubinstein & IES avec Low-End Trim)
     
-    private func computeAndApplyAdjustment(externalLux: Double, currentLamp: Double) {
+    private func computeAndApplyClosedLoop(sceneLuma: Double, currentLamp: Double) {
         let isLampOn = getIsLampOn?() ?? true
         
-        // Formule physique de compensation :
-        // L_total = L_ext + alpha * B = targetComfort
-        // => B_ideal = (targetComfort - L_ext) / alpha
-        let deficit = targetComfort - externalLux
-        let safeAlpha = max(0.08, couplingAlpha)
-        let desiredLamp = max(0.0, min(100.0, deficit / safeAlpha))
+        // Erreur de consigne = Confort souhaité - Lumière totale actuelle mesurée
+        let error = targetComfort - sceneLuma
         
         // -------------------------------------------------------------
         // CAS 1 : La lampe est actuellement ÉTEINTE (Veille AutoLight)
@@ -485,23 +566,27 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         if !isLampOn {
             if Date() < manualOffCooldownUntil {
                 DispatchQueue.main.async {
-                    self.statusMessage = "Éteint manuellement (pause)"
+                    self.statusMessage = L10n.manuallyOffPause
                 }
                 return
             }
             
-            // Allumage automatique si un besoin réel de lumière apparaît
-            if autoPowerToggle && deficit >= turnOnHysteresis {
+            // Seuil d'allumage calibré sur la marche minimale physique de la lampe :
+            // Pour éviter l'overshoot et le pompage (hunting), on n'allume que si le besoin
+            // de lumière dépasse la marche incompressible que la lampe injecte dès 1%.
+            let ignitionThreshold = max(turnOnHysteresis, minStepLuma * 0.85)
+            
+            if autoPowerToggle && error >= ignitionThreshold {
                 excessLightCycleCount = 0
                 DispatchQueue.main.async {
-                    self.statusMessage = "Allumage doux..."
+                    self.statusMessage = L10n.autoWakeMsg
                 }
-                // Amorce à 1% pour une transition d'allumage progressive sans sursaut
+                // Amorce douce au palier minimal physique (1%)
                 applyLampPower?(true)
                 applyLampBrightness?(1.0)
             } else {
                 DispatchQueue.main.async {
-                    self.statusMessage = "Veille (Lumière naturelle suffisante)"
+                    self.statusMessage = L10n.standbySufficient
                 }
             }
             return
@@ -511,14 +596,14 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         // CAS 2 : La lampe est ALLUMÉE
         // -------------------------------------------------------------
         
-        // Extinction automatique si la lumière du jour suffit (deficit <= 0%)
-        // et que la lampe a déjà été tamisée jusqu'au minimum (<= 1.5%)
-        if autoPowerToggle && deficit <= 0.0 && currentLamp <= 1.5 {
+        // Extinction automatique si les autres sources suffisent seules (error <= 0%)
+        // et que la lampe a déjà été tamisée jusqu'à son plancher (<= 1.5%)
+        if autoPowerToggle && error <= 0.0 && currentLamp <= 1.5 {
             excessLightCycleCount += 1
             if excessLightCycleCount >= excessCyclesRequired {
                 excessLightCycleCount = 0
                 DispatchQueue.main.async {
-                    self.statusMessage = "Extinction auto (lumière suffisante)"
+                    self.statusMessage = L10n.autoSleepMsg
                 }
                 applyLampPower?(false)
                 return
@@ -527,25 +612,30 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             excessLightCycleCount = 0
         }
         
-        let delta = desiredLamp - currentLamp
-        
-        // 1. Zone morte : ignore les micro-variations
-        if abs(delta) < deadband {
+        // 1. Zone morte dynamique proportionnelle au plancher minimal
+        let dynamicDeadband = max(deadband, minStepLuma * 0.25)
+        if abs(error) < dynamicDeadband {
             DispatchQueue.main.async {
-                self.statusMessage = "Ambiance stable"
+                self.statusMessage = L10n.stableAmbiance
             }
             return
         }
         
-        // 2. Limitation de rampe douce : 2% max par cycle (1.8s)
-        let step = max(-maxStepPerCycle, min(maxStepPerCycle, delta))
-        let nextBrightness = max(0.0, min(100.0, currentLamp + step))
+        // 2. Correction proportionnelle LBNL amortie : ΔB = (η / G) * error
+        // avec facteur d'amortissement critique η = 0.60
+        let dampingFactor = 0.60
+        let safeGain = max(0.08, couplingAlpha)
+        let desiredDelta = (dampingFactor / safeGain) * error
+        
+        // 3. Limitation de rampe douce : 2% max par cycle (1.8s)
+        let step = max(-maxStepPerCycle, min(maxStepPerCycle, desiredDelta))
+        let nextBrightness = max(1.0, min(100.0, currentLamp + step))
         
         DispatchQueue.main.async {
-            self.statusMessage = (delta > 0) ? "Compensation (+)..." : "Compensation (-)..."
+            self.statusMessage = (step > 0) ? L10n.compensatingPlus : L10n.compensatingMinus
         }
         
-        // 3. Application au variateur
+        // 4. Application au variateur
         applyLampBrightness?(nextBrightness)
     }
 }
