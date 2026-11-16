@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Build and binary artifacts
+*.o
+*.dSYM
+/build/
+/.build/
+/tmp/
+
+# Logs and runtime sockets
+*.log
+*.sock
+.gdansk_config.json
