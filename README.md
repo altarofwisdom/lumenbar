@@ -1,26 +1,34 @@
 # LumenBar
 
-> **Contrôleur Bluetooth Low Energy (BLE) direct et application macOS Menu Bar pour luminaires connectés (Inspire / Lexman / GATT).**
+> **Direct Bluetooth Low Energy (BLE) controller and native macOS menu bar app for smart fixtures (Inspire / Lexman / GATT).**
+
+**English** | [Français](README.fr.md)
 
 [![macOS](https://img.shields.io/badge/macOS-13.0+-black.svg?style=flat&logo=apple)](https://apple.com)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-F05138.svg?style=flat&logo=swift)](https://swift.org)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=flat&logo=python)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-LumenBar permet de piloter instantanément et localement en direct (sans pont Zigbee, sans passerelle Cloud, sans hub externe) les luminaires connectés commercialisés sous les marques **Inspire** et **Lexman** (groupe Adeo / Leroy Merlin, notamment le plafonnier LED *Inspire Gdansk* `ZBEK-27`) ainsi que tout équipement exploitant le service GATT propriétaire `0000a101-1115-1000-0001-617573746f6d`.
+LumenBar provides instant, direct local control (no Zigbee bridge, no cloud gateway, no external hub) for smart light fixtures sold under the **Inspire** and **Lexman** brands (Adeo / Leroy Merlin group, notably the *Inspire Gdansk* `ZBEK-27` LED ceiling panel) as well as any device implementing the proprietary GATT service `0000a101-1115-1000-0001-617573746f6d`.
 
 ---
 
-## Fonctionnalités
+## Features
 
-* 🚀 **Latence ultra-faible (< 30 ms)** : Démon Python d'arrière-plan maintenant une liaison BLE CoreBluetooth persistante et communiquant par socket UNIX avec l'interface.
-* 🖥️ **Application macOS Menu Bar native** : Développée en Swift & SwiftUI (`LSUIElement`), discrète dans la barre des menus, sans fenêtre flottante superflue.
-* 💡 **Gradateur & Allumage** : Contrôle continu de luminosité de 1% à 100% avec boutons de présélection instantanée (25%, 50%, 75%, 100%).
-* 👁️ **AutoLight par Webcam avec Découplage de Rétroaction** : Régulation adaptative selon la lumière ambiante naturelle, immunisée contre les boucles de rétroaction optique (Feed-Forward Cancellation $L_{\text{ext}} = L_{\text{mesuré}} - \alpha \cdot B$, étalonnage automatique de $\alpha$, bande morte $\pm 4\%$ et limitation de rampe $2.5\%$/s).
-* 🌡️ **Blanc variable CCT (2700K - 6500K)** : Régulation continue de la température de couleur (Chaud, Neutre, Froid).
-* 🎨 **Roue Chromatique 360°** : Prise en charge de la sélection de teinte exacte ou via palette de nuances directes.
-* 🔍 **Découverte & Appairage intégrés** : Scanner Bluetooth intégré dans l'application pour détecter, associer ou oublier un luminaire en un clic.
-* 🔌 **Arrêt propre & Éco-énergie** : Extinction automatique de l'éclairage et fermeture propre de la session BLE à la fermeture de l'application.
+* 🚀 **Ultra-low latency (< 30 ms)**: Background daemon maintaining a persistent CoreBluetooth link and communicating via UNIX domain socket.
+* 🖥️ **Native macOS Menu Bar App**: Built with Swift & SwiftUI (`LSUIElement`), unobtrusive in the status bar with no lingering windows.
+* 🌐 **Bilingual (English & French)**: Automatic macOS system language detection with in-app manual preference override.
+* 💡 **Dimming & Power**: Continuous brightness control from 0% to 100% with one-click quick presets (25%, 50%, 75%, 100%).
+* 👁️ **Closed-Loop AutoLight (Daylight Harvesting)**: Proportional closed-loop regulation based on standard LBNL / IES daylight harvesting principles, steering total desk illuminance toward your target comfort level.
+* 🔒 **Webcam Exposure Locking**: Hardware locking of camera AEC/AGC (`AVCaptureExposureMode.locked`) to prevent webcam auto-gain compensation from distorting ambient light readings.
+* 🎯 **3-Point Differential Calibration & Low-End Trim**: Calibrates ambient baseline ($S_{\text{off}}$), minimum physical output at 1% ($\Delta S_{\text{min}}$), and optical gain slope ($S_{80\%}$) to prevent hunting at low brightness.
+* 📉 **Ultra-smooth slew rate**: Ramp rate capped at $\le 1\%$ per 1.8s cycle for imperceptible lighting transitions.
+* 🌙 **Automatic Sleep & Wake**: Gracefully dims and turns off the lamp when natural daylight meets the target setpoint, and wakes back up when room light dims (with anti-chatter hysteresis).
+* 📹 **Webcam Selector**: Live detection and selection across physical and virtual cameras (Continuity Camera, OBS, etc.).
+* 🌡️ **Tunable White CCT (2700K - 6500K)**: Continuous Kelvin / Mired temperature slider (Warm, Neutral, Cold).
+* 🎨 **360° Color Wheel**: Direct hue picker and curated color swatches.
+* 🔍 **Built-in Device Discovery & Pairing**: Integrated Bluetooth scanner to discover, pair, or unpair fixtures in one click.
+* 🔌 **Graceful Shutdown**: Turns off light and terminates BLE connection cleanly on app quit.
 
 ---
 
@@ -29,107 +37,114 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 ```
 ┌────────────────────────────────────────────────────────┐
 │      LumenBar.app (SwiftUI & AppKit MenuBarExtra)      │
-│      • Interface popover barre des menus               │
-│      • Gestion de la découverte BLE et appairage       │
-│      • Sliders & sélecteurs d'état                     │
+│      • Menu bar popover interface (Bilingual EN/FR)    │
+│      • AutoLight Engine (AVFoundation + closed loop)   │
+│      • BLE Device Manager & Pairing                    │
 └───────────────────────────┬────────────────────────────┘
-                            │ Socket UNIX (/tmp/lumenbar.sock)
+                            │ UNIX Domain Socket (/tmp/lumenbar.sock)
                             ▼
 ┌────────────────────────────────────────────────────────┐
-│      Démon Python BLE (`lumenbar.py _daemon_worker`)   │
-│      • Maintient la connexion CoreBluetooth (Bleak)    │
-│      • Traite les requêtes asynchrones en continu      │
-│      • Reçoit et décode les notifications de la lampe  │
+│      Python BLE Daemon (`lumenbar.py _daemon_worker`)  │
+│      • Maintains CoreBluetooth link (Bleak)            │
+│      • Processes continuous asynchronous requests      │
+│      • Receives and decodes fixture notifications      │
 └───────────────────────────┬────────────────────────────┘
                             │ Bluetooth LE GATT
                             ▼
 ┌────────────────────────────────────────────────────────┐
-│      Luminaire Connecté (Inspire / Lexman / ZBEK-27)   │
+│      Smart Fixture (Inspire / Lexman / ZBEK-27)        │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Régulation Adaptative AutoLight (Anti-Rétroaction)
+## Closed-Loop AutoLight (Daylight Harvesting)
 
-Quand une webcam pointe vers un bureau éclairé par la lampe, tout assombrissement externe induit une hausse de la lampe, laquelle renvoie du flux vers la caméra. Sans précaution, ce couplage engendre un pompage oscillatoire permanent ou une lutte avec l'exposition automatique (AEC) de la caméra.
+### The Webcam Sensor Challenge
+When a camera monitors a workspace lit by an adjustable artificial light, two physical factors undermine simple control systems:
+1. **Camera Auto-Exposure (AEC/AGC)**: As the lamp dims, the webcam sensor automatically boosts its analog and digital gain. The raw measured pixel luminance remains flat, creating an auto-exposure paradox where ambient light appears to rise as the lamp dims.
+2. **Minimum Output Floor (Low-End Trim)**: Many LED panels (including Inspire/Lexman fixtures) emit noticeable luminous flux even at their lowest setting (1%). If a controller turns the lamp on for a tiny light deficit, the minimum step overshoots the setpoint, triggering an immediate shut-off and creating an endless on/off oscillation (*hunting*).
 
-LumenBar résout ce problème avec une boucle de contrôle découplée :
-1. **Échantillonnage passif & confidentiel** : Prélèvement discret (1 trame toutes les 1.8s) via `AVFoundation` sous forme de matrice réduite en RAM (aucune vidéo ni photo n'est enregistrée).
-2. **Découplage Feed-Forward** : Soustraction de la contribution propre de la lampe :
-   $$L_{\text{externe}} = \max(0, L_{\text{mesuré}} - \alpha \cdot B_{\text{lampe}})$$
-3. **Auto-Étalonnage du coefficient $\alpha$** : Mesure in-situ du couplage optique par échelon test pour déduire le facteur $\alpha$ spécifique à la géométrie de la pièce.
-4. **Filtre passe-bas (EMA) & Bande morte ($\pm 4\%$)** : Les ombres fugaces (passage d'une main, mouvement de tête) sont filtrées.
-5. **Limitation de rampe douce** : Variation bornée à $\le 2.5\%$ par cycle, garantissant des transitions visuelles fluides et reposantes pour les yeux.
-6. **Extinction & Rallumage Automatique (Veille Éco)** : Si la lumière du jour suffit pour combler l'ambiance cible, la lampe est progressivement tamisée jusqu'à 0 % puis s'éteint complètement (`off`). Dès que la lumière ambiante naturelle redescend sous le seuil désiré (avec hystérésis anti-pompage), la lampe se rallume automatiquement (`on`) avec une amorce douce.
+### The LumenBar Architecture
+1. **Hardware Exposure Lock**: Whenever AutoLight or calibration runs, the webcam exposure duration and sensor ISO are locked (`AVCaptureExposureMode.locked`). Sensor response becomes strictly proportional to real photons on desk surfaces.
+2. **Passive & Private Sampling**: A downsampled frame is processed in volatile RAM every 1.8 seconds via `AVFoundation`. No video or photographic data is ever written to disk or transmitted over the network.
+3. **3-Point Differential Calibration**:
+   - Step 1 (Lamp Off): Measures baseline ambient room illuminance $S_{\text{off}}$.
+   - Step 2 (Lamp at 1%): Measures the minimum physical output floor $\Delta S_{\text{min}} = S_{1\%} - S_{\text{off}}$.
+   - Step 3 (Lamp at 80%): Computes the differential optical gain slope $G = \frac{S_{80\%} - S_{\text{off}}}{80}$.
+4. **Closed-Loop Error Regulation**:
+   $$\Delta B = \frac{\eta}{G} \cdot (S_{\text{target}} - S(t))$$
+   with damped gain $\eta = 0.40$ and an error deadband of $\pm 1.5\%$.
+5. **Low-End Trim Ignition Hysteresis**: When the lamp is off, it will only ignite if the daylight deficit is large enough to absorb the minimum 1% light output ($S_{\text{target}} - S(t) \ge \Delta S_{\text{min}} \times 0.85$), eliminating low-end hunting.
+6. **Ultra-Smooth Slew Rate**: Luminance adjustments are capped at $\le 1\%$ per cycle (1.8s), making light adaptations entirely imperceptible to working eyes.
 
 ---
 
-## Protocole GATT & Trames Hexadécimales
+## GATT Protocol & Hexadecimal Frames
 
-* **UUID d'écriture (Write with response)** : `0000a101-1115-1000-0001-617573746f6d`
-* **UUID de lecture / notifications** : `0000a102-1115-1000-0001-617573746f6d`
+* **Write Characteristic (Write with response)**: `0000a101-1115-1000-0001-617573746f6d`
+* **Read / Notification Characteristic**: `0000a102-1115-1000-0001-617573746f6d`
 
-### Format des Trames de Commande
+### Command Frame Structure
 
-Chaque trame commence par le préfixe `00 00` suivi de l'identifiant de fonction (opcode), de la longueur utile et de la valeur :
+Each command starts with the prefix `00 00`, followed by the function identifier (opcode), data length, and payload:
 
-| Fonction | Opcode | Trame Hexadécimale | Plage / Description |
+| Function | Opcode | Hexadecimal Frame | Range / Description |
 | :--- | :---: | :--- | :--- |
-| **Allumage (ON)** | `0x10` | `0000100103010000` | Allume le luminaire |
-| **Extinction (OFF)**| `0x10` | `0000100103000000` | Éteint le luminaire |
-| **Luminosité (Dim)**| `0x11` | `0000110103[VAL]0000` | `[VAL]` de `0x00` (0%) à `0xFE` (100%) |
-| **Blanc CCT** | `0x12` | `0000120104[B1][B0]0000` | Valeur 16-bit Mireds (`0x0099` = 6500K à `0x01C6` = 2700K) |
-| **Teinte (Hue)** | `0x13` | `0000130103[VAL]0000` | Angle 0°–360° proportionnel sur `0x00` à `0xFE` |
+| **Power ON** | `0x10` | `0000100103010000` | Turns fixture ON |
+| **Power OFF**| `0x10` | `0000100103000000` | Turns fixture OFF |
+| **Brightness (Dim)**| `0x11` | `0000110103[VAL]0000` | `[VAL]` from `0x00` (0%) to `0xFE` (100%) |
+| **White CCT** | `0x12` | `0000120104[B1][B0]0000` | 16-bit Mireds (`0x0099` = 6500K to `0x01C6` = 2700K) |
+| **Hue** | `0x13` | `0000130103[VAL]0000` | Angle 0°–360° mapped linearly to `0x00`–`0xFE` |
 
-### Interrogation d'État
-* `00001002` : Lecture de l'état d'alimentation
-* `00001102` : Lecture du niveau de luminosité
-* `00001202` : Lecture de la température CCT
-* `00001302` : Lecture de la teinte de couleur
+### State Queries
+* `00001002`: Query power state
+* `00001102`: Query brightness level
+* `00001202`: Query CCT temperature
+* `00001302`: Query color hue
 
 ---
 
-## Utilisation en Ligne de Commande (CLI)
+## Command-Line Interface (CLI)
 
-Le script Python [Resources/lumenbar.py](file:///Users/yoto/LumenBar/Resources/lumenbar.py) peut être utilisé directement :
+The Python daemon script [Resources/lumenbar.py](file:///Users/yoto/LumenBar/Resources/lumenbar.py) can also be used directly from the terminal:
 
 ```bash
-# Rechercher les luminaires compatibles
+# Scan for compatible fixtures
 python3 Resources/lumenbar.py scan
 
-# Allumer / Éteindre
+# Power ON / OFF
 python3 Resources/lumenbar.py on
 python3 Resources/lumenbar.py off
 
-# Régler la luminosité (0 à 100 %)
+# Adjust brightness (0 to 100%)
 python3 Resources/lumenbar.py dim 60
 
-# Régler la température de blanc (2700 à 6500 K)
+# Adjust white color temperature (2700 to 6500 K)
 python3 Resources/lumenbar.py temp 4000
 
-# Régler la couleur (nom ou degré 0-360)
+# Set color (name or hue angle 0-360)
 python3 Resources/lumenbar.py color blue
 python3 Resources/lumenbar.py hue 210
 
-# Consulter l'état complet
+# Read current device status
 python3 Resources/lumenbar.py status
 ```
 
 ---
 
-## Compilation & Installation de l'Application macOS
+## Building & Installing the macOS App
 
-L'application ne requiert pas Xcode complet : les Command Line Tools (`swiftc`) suffisent :
+No full Xcode installation is required. macOS Command Line Tools (`swiftc`) are sufficient:
 
 ```bash
 ./build.sh
 ```
 
-Le script produit et signe localement l'application dans `~/Applications/LumenBar.app`.
+The script compiles the Swift sources and produces an ad-hoc signed app bundle in `~/Applications/LumenBar.app`.
 
 ---
 
-## Licence
+## License
 
-Projet open source publié sous licence [MIT](LICENSE).
+Open source project released under the [MIT](LICENSE) license.
