@@ -561,7 +561,7 @@ class LampController: ObservableObject {
     
     func userSetBrightness(_ val: Double, immediate: Bool = false) {
         if autoLight.isEnabled {
-            autoLight.targetComfort = val
+            autoLight.targetComfort = min(100.0, max(0.0, autoLight.estimatedExternalLux + (autoLight.couplingAlpha * val)))
         }
         setBrightness(val, immediate: immediate)
     }

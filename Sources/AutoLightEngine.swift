@@ -92,12 +92,12 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     
     private var smoothedExternalLux: Double = 50.0
     private let emaFactor: Double = 0.80 // Filtre passe-bas (lissage sur ~8 secondes)
-    private let deadband: Double = 4.0   // Seuil d'hystérésis (pas d'action si écart < 4%)
-    private let maxStepPerCycle: Double = 2.5 // Rampe douce max par cycle
+    private let deadband: Double = 1.5   // Seuil d'hystérésis (pas d'action si écart < 1.5%)
+    private let maxStepPerCycle: Double = 2.0 // Rampe douce de 2% max par cycle (1.8s)
     
     private var excessLightCycleCount: Int = 0
     private let excessCyclesRequired: Int = 2 // ~3.6s de confirmation pour extinction auto
-    private let turnOnHysteresis: Double = 4.0 // Déficit minimum de 4% pour rallumage auto
+    private let turnOnHysteresis: Double = 1.5 // Déficit minimum de 1.5% pour amorcer l'allumage
     private var manualOffCooldownUntil: Date = Date.distantPast
     
     func userDidManuallyTurnOff() {
@@ -471,13 +471,18 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     
     private func computeAndApplyAdjustment(externalLux: Double, currentLamp: Double) {
         let isLampOn = getIsLampOn?() ?? true
+        
+        // Formule physique de compensation :
+        // L_total = L_ext + alpha * B = targetComfort
+        // => B_ideal = (targetComfort - L_ext) / alpha
         let deficit = targetComfort - externalLux
+        let safeAlpha = max(0.08, couplingAlpha)
+        let desiredLamp = max(0.0, min(100.0, deficit / safeAlpha))
         
         // -------------------------------------------------------------
         // CAS 1 : La lampe est actuellement ÉTEINTE (Veille AutoLight)
         // -------------------------------------------------------------
         if !isLampOn {
-            // Si l'utilisateur a éteint manuellement la lampe récemment
             if Date() < manualOffCooldownUntil {
                 DispatchQueue.main.async {
                     self.statusMessage = "Éteint manuellement (pause)"
@@ -485,15 +490,15 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
                 return
             }
             
-            // Si la lumière extérieure devient inférieure au confort souhaité
-            if autoPowerToggle && deficit > turnOnHysteresis {
+            // Allumage automatique si un besoin réel de lumière apparaît
+            if autoPowerToggle && deficit >= turnOnHysteresis {
                 excessLightCycleCount = 0
-                let initialB = max(10.0, min(100.0, targetComfort + (deficit * 0.8)))
                 DispatchQueue.main.async {
-                    self.statusMessage = "Rallumage auto (lumière faible)"
+                    self.statusMessage = "Allumage doux..."
                 }
+                // Amorce à 1% pour une transition d'allumage progressive sans sursaut
                 applyLampPower?(true)
-                applyLampBrightness?(initialB)
+                applyLampBrightness?(1.0)
             } else {
                 DispatchQueue.main.async {
                     self.statusMessage = "Veille (Lumière naturelle suffisante)"
@@ -506,9 +511,9 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         // CAS 2 : La lampe est ALLUMÉE
         // -------------------------------------------------------------
         
-        // Extinction automatique si la lumière naturelle suffit largement (déficit <= -2%)
-        // et que la lampe a déjà été tamisée jusqu'au minimum (<= 4%)
-        if autoPowerToggle && deficit <= -2.0 && currentLamp <= 4.0 {
+        // Extinction automatique si la lumière du jour suffit (deficit <= 0%)
+        // et que la lampe a déjà été tamisée jusqu'au minimum (<= 1.5%)
+        if autoPowerToggle && deficit <= 0.0 && currentLamp <= 1.5 {
             excessLightCycleCount += 1
             if excessLightCycleCount >= excessCyclesRequired {
                 excessLightCycleCount = 0
@@ -522,13 +527,9 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             excessLightCycleCount = 0
         }
         
-        // Consigne désirée = f(targetComfort, externalLux)
-        var desiredLamp = targetComfort + (deficit * 0.8)
-        desiredLamp = max(0.0, min(100.0, desiredLamp))
-        
         let delta = desiredLamp - currentLamp
         
-        // 1. Bande morte (Deadband) : ignore les micro-écarts (< 4%)
+        // 1. Zone morte : ignore les micro-variations
         if abs(delta) < deadband {
             DispatchQueue.main.async {
                 self.statusMessage = "Ambiance stable"
@@ -536,7 +537,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             return
         }
         
-        // 2. Limitation de rampe (Slew Rate Limiter) : variation progressive de 2.5% max
+        // 2. Limitation de rampe douce : 2% max par cycle (1.8s)
         let step = max(-maxStepPerCycle, min(maxStepPerCycle, delta))
         let nextBrightness = max(0.0, min(100.0, currentLamp + step))
         
@@ -544,7 +545,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             self.statusMessage = (delta > 0) ? "Compensation (+)..." : "Compensation (-)..."
         }
         
-        // 3. Application immédiate à la lampe
+        // 3. Application au variateur
         applyLampBrightness?(nextBrightness)
     }
 }
