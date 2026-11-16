@@ -59,6 +59,9 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     /// Message d'état pour l'interface
     @Published var statusMessage: String = "Inactif"
     
+    /// Autorise l'extinction et le rallumage automatique de la lampe si la lumière naturelle suffit
+    @Published var autoPowerToggle: Bool = true
+    
     /// Autorisation d'accès à la caméra
     @Published var cameraAuthorized: Bool = false
     
@@ -66,6 +69,12 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     
     /// Lecture de la luminosité actuelle de la lampe
     var getCurrentLampBrightness: (() -> Double)?
+    
+    /// Lecture de l'état d'allumage (ON/OFF)
+    var getIsLampOn: (() -> Bool)?
+    
+    /// Commande d'allumage/extinction automatique de la lampe
+    var applyLampPower: ((Bool) -> Void)?
     
     /// Envoi de la consigne de luminosité à la lampe
     var applyLampBrightness: ((Double) -> Void)?
@@ -85,6 +94,19 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     private let emaFactor: Double = 0.80 // Filtre passe-bas (lissage sur ~8 secondes)
     private let deadband: Double = 4.0   // Seuil d'hystérésis (pas d'action si écart < 4%)
     private let maxStepPerCycle: Double = 2.5 // Rampe douce max par cycle
+    
+    private var excessLightCycleCount: Int = 0
+    private let excessCyclesRequired: Int = 2 // ~3.6s de confirmation pour extinction auto
+    private let turnOnHysteresis: Double = 4.0 // Déficit minimum de 4% pour rallumage auto
+    private var manualOffCooldownUntil: Date = Date.distantPast
+    
+    func userDidManuallyTurnOff() {
+        manualOffCooldownUntil = Date().addingTimeInterval(120.0)
+    }
+    
+    func userDidManuallyTurnOn() {
+        manualOffCooldownUntil = Date.distantPast
+    }
     
     // MARK: - Initialisation
     
@@ -445,13 +467,62 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         return averageLuma
     }
     
-    // MARK: - Algorithme de Régulation Douce
+    // MARK: - Algorithme de Régulation Douce & Extinction/Rallumage Automatique
     
     private func computeAndApplyAdjustment(externalLux: Double, currentLamp: Double) {
-        // Si l'extérieur est très lumineux (ex: 80%), la lampe compense au minimum
-        // Si l'extérieur est sombre (ex: 10%), la lampe augmente pour compenser
-        // Consigne désirée = f(targetComfort, externalLux)
+        let isLampOn = getIsLampOn?() ?? true
         let deficit = targetComfort - externalLux
+        
+        // -------------------------------------------------------------
+        // CAS 1 : La lampe est actuellement ÉTEINTE (Veille AutoLight)
+        // -------------------------------------------------------------
+        if !isLampOn {
+            // Si l'utilisateur a éteint manuellement la lampe récemment
+            if Date() < manualOffCooldownUntil {
+                DispatchQueue.main.async {
+                    self.statusMessage = "Éteint manuellement (pause)"
+                }
+                return
+            }
+            
+            // Si la lumière extérieure devient inférieure au confort souhaité
+            if autoPowerToggle && deficit > turnOnHysteresis {
+                excessLightCycleCount = 0
+                let initialB = max(10.0, min(100.0, targetComfort + (deficit * 0.8)))
+                DispatchQueue.main.async {
+                    self.statusMessage = "Rallumage auto (lumière faible)"
+                }
+                applyLampPower?(true)
+                applyLampBrightness?(initialB)
+            } else {
+                DispatchQueue.main.async {
+                    self.statusMessage = "Veille (Lumière naturelle suffisante)"
+                }
+            }
+            return
+        }
+        
+        // -------------------------------------------------------------
+        // CAS 2 : La lampe est ALLUMÉE
+        // -------------------------------------------------------------
+        
+        // Extinction automatique si la lumière naturelle suffit largement (déficit <= -2%)
+        // et que la lampe a déjà été tamisée jusqu'au minimum (<= 4%)
+        if autoPowerToggle && deficit <= -2.0 && currentLamp <= 4.0 {
+            excessLightCycleCount += 1
+            if excessLightCycleCount >= excessCyclesRequired {
+                excessLightCycleCount = 0
+                DispatchQueue.main.async {
+                    self.statusMessage = "Extinction auto (lumière suffisante)"
+                }
+                applyLampPower?(false)
+                return
+            }
+        } else {
+            excessLightCycleCount = 0
+        }
+        
+        // Consigne désirée = f(targetComfort, externalLux)
         var desiredLamp = targetComfort + (deficit * 0.8)
         desiredLamp = max(0.0, min(100.0, desiredLamp))
         

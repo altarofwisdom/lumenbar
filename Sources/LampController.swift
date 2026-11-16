@@ -80,7 +80,16 @@ class LampController: ObservableObject {
         
         // Configuration callbacks AutoLight
         autoLight.getCurrentLampBrightness = { [weak self] in
-            return self?.brightness ?? 50.0
+            guard let self = self else { return 50.0 }
+            return self.isOn ? self.brightness : 0.0
+        }
+        autoLight.getIsLampOn = { [weak self] in
+            return self?.isOn ?? false
+        }
+        autoLight.applyLampPower = { [weak self] on in
+            DispatchQueue.main.async {
+                self?.setPower(on)
+            }
         }
         autoLight.applyLampBrightness = { [weak self] newB in
             DispatchQueue.main.async {
@@ -529,11 +538,23 @@ class LampController: ObservableObject {
         }
     }
     
+    func setPower(_ on: Bool) {
+        guard isOn != on else { return }
+        isOn = on
+        if isOn {
+            sendImmediate("on")
+        } else {
+            sendImmediate("off")
+        }
+    }
+    
     func togglePower() {
         isOn.toggle()
         if !isOn {
+            autoLight.userDidManuallyTurnOff()
             sendImmediate("off")
         } else {
+            autoLight.userDidManuallyTurnOn()
             sendImmediate("on")
         }
     }

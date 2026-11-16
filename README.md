@@ -61,6 +61,7 @@ LumenBar résout ce problème avec une boucle de contrôle découplée :
 3. **Auto-Étalonnage du coefficient $\alpha$** : Mesure in-situ du couplage optique par échelon test pour déduire le facteur $\alpha$ spécifique à la géométrie de la pièce.
 4. **Filtre passe-bas (EMA) & Bande morte ($\pm 4\%$)** : Les ombres fugaces (passage d'une main, mouvement de tête) sont filtrées.
 5. **Limitation de rampe douce** : Variation bornée à $\le 2.5\%$ par cycle, garantissant des transitions visuelles fluides et reposantes pour les yeux.
+6. **Extinction & Rallumage Automatique (Veille Éco)** : Si la lumière du jour suffit pour combler l'ambiance cible, la lampe est progressivement tamisée jusqu'à 0 % puis s'éteint complètement (`off`). Dès que la lumière ambiante naturelle redescend sous le seuil désiré (avec hystérésis anti-pompage), la lampe se rallume automatiquement (`on`) avec une amorce douce.
 
 ---
 

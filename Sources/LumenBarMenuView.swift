@@ -611,6 +611,19 @@ struct AutoLightSectionView: View {
                         }
                         Slider(value: $autoLight.targetComfort, in: 0...100)
                     }
+                    
+                    // Extinction & rallumage automatique
+                    HStack {
+                        Text("Éteindre/rallumer auto")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Toggle("", isOn: $autoLight.autoPowerToggle)
+                            .toggleStyle(.switch)
+                            .scaleEffect(0.65)
+                            .labelsHidden()
+                    }
+                    .help("Éteint automatiquement la lampe si la lumière du jour suffit, et la rallume dès que la pièce s'assombrit")
                 }
                 .padding(8)
                 .background(Color.primary.opacity(0.04))
