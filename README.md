@@ -21,8 +21,8 @@ LumenBar provides instant, direct local control (no Zigbee bridge, no cloud gate
 * 💡 **Dimming & Power**: Continuous brightness control from 0% to 100% with one-click quick presets (25%, 50%, 75%, 100%).
 * 👁️ **Closed-Loop AutoLight (Daylight Harvesting)**: Proportional closed-loop regulation based on standard LBNL / IES daylight harvesting principles, steering total desk illuminance toward your target comfort level.
 * 🔒 **Webcam Exposure Locking**: Hardware locking of camera AEC/AGC (`AVCaptureExposureMode.locked`) to prevent webcam auto-gain compensation from distorting ambient light readings.
-* 🎯 **3-Point Differential Calibration & Low-End Trim**: Calibrates ambient baseline ($S_{\text{off}}$), minimum physical output at 1% ($\Delta S_{\text{min}}$), and optical gain slope ($S_{80\%}$) to prevent hunting at low brightness.
-* 📉 **Ultra-smooth slew rate**: Ramp rate capped at $\le 1\%$ per 1.8s cycle for imperceptible lighting transitions.
+* 🎯 **3-Point Differential Calibration & Low-End Trim**: Calibrates ambient baseline ($S_{\text{off}}$), minimum physical output at 1% ($\Delta S_{\text{min}}$), and optical gain slope ($S_{80}$ at 80%) to prevent hunting at low brightness.
+* 📉 **Ultra-smooth slew rate**: Ramp rate capped at $\le 1$% per 1.8s cycle for imperceptible lighting transitions.
 * 🌙 **Automatic Sleep & Wake**: Gracefully dims and turns off the lamp when natural daylight meets the target setpoint, and wakes back up when room light dims (with anti-chatter hysteresis).
 * 📹 **Webcam Selector**: Live detection and selection across physical and virtual cameras (Continuity Camera, OBS, etc.).
 * 🌡️ **Tunable White CCT (2700K - 6500K)**: Continuous Kelvin / Mired temperature slider (Warm, Neutral, Cold).
@@ -70,13 +70,13 @@ When a camera monitors a workspace lit by an adjustable artificial light, two ph
 2. **Passive & Private Sampling**: A downsampled frame is processed in volatile RAM every 1.8 seconds via `AVFoundation`. No video or photographic data is ever written to disk or transmitted over the network.
 3. **3-Point Differential Calibration**:
    - Step 1 (Lamp Off): Measures baseline ambient room illuminance $S_{\text{off}}$.
-   - Step 2 (Lamp at 1%): Measures the minimum physical output floor $\Delta S_{\text{min}} = S_{1\%} - S_{\text{off}}$.
-   - Step 3 (Lamp at 80%): Computes the differential optical gain slope $G = \frac{S_{80\%} - S_{\text{off}}}{80}$.
+   - Step 2 (Lamp at 1%): Measures the minimum physical output floor $\Delta S_{\text{min}} = S_{1} - S_{\text{off}}$.
+   - Step 3 (Lamp at 80%): Computes the differential optical gain slope $G = \frac{S_{80} - S_{\text{off}}}{80}$.
 4. **Closed-Loop Error Regulation**:
    $$\Delta B = \frac{\eta}{G} \cdot (S_{\text{target}} - S(t))$$
-   with damped gain $\eta = 0.40$ and an error deadband of $\pm 1.5\%$.
+   with damped gain $\eta = 0.40$ and an error deadband of $\pm 1.5$%.
 5. **Low-End Trim Ignition Hysteresis**: When the lamp is off, it will only ignite if the daylight deficit is large enough to absorb the minimum 1% light output ($S_{\text{target}} - S(t) \ge \Delta S_{\text{min}} \times 0.85$), eliminating low-end hunting.
-6. **Ultra-Smooth Slew Rate**: Luminance adjustments are capped at $\le 1\%$ per cycle (1.8s), making light adaptations entirely imperceptible to working eyes.
+6. **Ultra-Smooth Slew Rate**: Luminance adjustments are capped at $\le 1$% per cycle (1.8s), making light adaptations entirely imperceptible to working eyes.
 
 ---
 

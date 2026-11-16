@@ -21,7 +21,7 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 * 💡 **Gradateur & Allumage** : Contrôle continu de luminosité de 0% à 100% avec boutons de présélection instantanée (25%, 50%, 75%, 100%).
 * 👁️ **Régulation AutoLight en Boucle Fermée (Daylight Harvesting)** : Asservissement inspiré des standards LBNL / IES régulant la luminosité totale perçue vers une consigne de confort.
 * 🔒 **Verrouillage de l'exposition webcam** : Blocage matériel de l'AEC/AGC (`AVCaptureExposureMode.locked`) pour éliminer le paradoxe d'amplification automatique du capteur vidéo.
-* 🎯 **Étalonnage différentiel 3 points & Low-End Trim** : Mesure du fond ambiant ($S_{\text{off}}$), de l'émission plancher à 1% ($\Delta S_{\text{min}}$) et du gain optique ($S_{80\%}$) pour éliminer tout effet de pompage (*hunting*) à basse puissance.
+* 🎯 **Étalonnage différentiel 3 points & Low-End Trim** : Mesure du fond ambiant ($S_{\text{off}}$), de l'émission plancher à 1% ($\Delta S_{\text{min}}$) et du gain optique ($S_{80}$ à 80%) pour éliminer tout effet de pompage (*hunting*) à basse puissance.
 * 📉 **Rampe ultra-douce** : Variations limitées à 1% par cycle (1.8s) pour des transitions imperceptibles pour les yeux.
 * 🌙 **Veille & Réveil automatique** : Extinction complète quand la lumière du jour suffit, et rallumage progressif dès que la pièce s'assombrit (avec hystérésis anti-oscillation).
 * 📹 **Sélecteur de webcam** : Détection dynamique et bascule à chaud entre caméras physiques et virtuelles (Continuity, OBS, etc.).
@@ -62,7 +62,7 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 
 ### Le Problème du Capteur Vidéo
 Lorsqu'une webcam observe un espace de travail éclairé par une source artificielle régulée, deux phénomènes physiques perturbent les asservissements classiques :
-1. **L'Auto-Exposition de la caméra (AEC/AGC)** : Quand la lampe faiblit, l'algorithme d'exposition de la caméra augmente le gain du capteur. La luminance moyenne brute mesurée reste alors constante, ce qui fausse toute estimation découplée simple ($L_{\text{mesuré}} - \alpha B$).
+1. **L'Auto-Exposition de la caméra (AEC/AGC)** : Quand la lampe faiblit, l'algorithme d'exposition de la caméra augmente le gain du capteur. La luminance moyenne brute mesurée reste alors constante, ce qui fausse toute estimation découplée simple ($L_{\text{brut}} - \alpha B$).
 2. **Le Plancher d'Émission Minimale (Low-End Trim)** : De nombreux panneaux LED (dont la gamme Inspire/Lexman) émettent un flux lumineux significatif dès leur seuil minimal de 1%. Si le régulateur allume la lampe pour combler un faible déficit lumineux, l'apport dépasse instantanément la consigne, provoquant une extinction immédiate (effet d'oscillation continue / *hunting*).
 
 ### La Solution LumenBar
@@ -70,13 +70,13 @@ Lorsqu'une webcam observe un espace de travail éclairé par une source artifici
 2. **Échantillonnage passif & confidentiel** : Prélèvement d'une miniature en RAM toutes les 1.8s via `AVFoundation`. Aucune image n'est enregistrée sur disque ni transmise sur le réseau.
 3. **Étalonnage différentiel 3 points** :
    - Échelon 1 (Lampe éteinte) : mesure de la lumière ambiante de fond $S_{\text{off}}$.
-   - Échelon 2 (Lampe à 1%) : mesure de l'émission minimale $\Delta S_{\text{min}} = S_{1\%} - S_{\text{off}}$.
-   - Échelon 3 (Lampe à 80%) : calcul du gain optique différentiel $G = \frac{S_{80\%} - S_{\text{off}}}{80}$.
+   - Échelon 2 (Lampe à 1%) : mesure de l'émission minimale $\Delta S_{\text{min}} = S_{1} - S_{\text{off}}$.
+   - Échelon 3 (Lampe à 80%) : calcul du gain optique différentiel $G = \frac{S_{80} - S_{\text{off}}}{80}$.
 4. **Asservissement en boucle fermée (Closed-Loop Error Regulation)** :
    $$\Delta B = \frac{\eta}{G} \cdot (S_{\text{cible}} - S(t))$$
-   avec un facteur de gain amorti $\eta = 0.40$ et une bande morte de $\pm 1.5\%$.
+   avec un facteur de gain amorti $\eta = 0.40$ et une bande morte de $\pm 1.5$%.
 5. **Hystérésis d'allumage basée sur le Low-End Trim** : Quand la lampe est éteinte, elle ne se rallume que si le déficit mesuré est suffisant pour absorber le flux minimal de 1% ($S_{\text{cible}} - S(t) \ge \Delta S_{\text{min}} \times 0.85$), éliminant tout pompage.
-6. **Rampe de variation ultra-douce** : L'ajustement est limité à $\le 1\%$ par cycle (1.8s), rendant l'adaptation lumineuse totalement imperceptible pour l'utilisateur au travail.
+6. **Rampe de variation ultra-douce** : L'ajustement est limité à $\le 1$% par cycle (1.8s), rendant l'adaptation lumineuse totalement imperceptible pour l'utilisateur au travail.
 
 ---
 
