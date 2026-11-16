@@ -34,6 +34,9 @@ class LampController: ObservableObject {
     @Published var scanMessage: String? = nil
     @Published var showDeviceManager: Bool = false
     
+    // MARK: - Moteur AutoLight (Webcam)
+    @Published var autoLight = AutoLightEngine()
+    
     private var daemonProcess: Process?
     private var healthCheckTimer: Timer?
     private var throttleWorkItem: DispatchWorkItem?
@@ -73,6 +76,17 @@ class LampController: ObservableObject {
     init() {
         loadConfiguredAddress()
         startHealthTimer()
+        
+        // Configuration callbacks AutoLight
+        autoLight.getCurrentLampBrightness = { [weak self] in
+            return self?.brightness ?? 50.0
+        }
+        autoLight.applyLampBrightness = { [weak self] newB in
+            DispatchQueue.main.async {
+                self?.setBrightness(newB, immediate: true)
+            }
+        }
+        
         if configuredAddress != nil {
             ensureDaemonRunning()
         } else {
@@ -376,6 +390,7 @@ class LampController: ObservableObject {
     }
     
     func shutdown() {
+        autoLight.stop()
         healthCheckTimer?.invalidate()
         healthCheckTimer = nil
         
@@ -512,6 +527,13 @@ class LampController: ObservableObject {
         } else {
             sendImmediate("on")
         }
+    }
+    
+    func userSetBrightness(_ val: Double, immediate: Bool = false) {
+        if autoLight.isEnabled {
+            autoLight.targetComfort = val
+        }
+        setBrightness(val, immediate: immediate)
     }
     
     func setBrightness(_ val: Double, immediate: Bool = false) {

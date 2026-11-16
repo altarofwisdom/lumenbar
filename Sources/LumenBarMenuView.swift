@@ -95,12 +95,12 @@ struct LumenBarMenuView: View {
                     Slider(
                         value: Binding(
                             get: { lamp.brightness },
-                            set: { lamp.setBrightness($0, immediate: false) }
+                            set: { lamp.userSetBrightness($0, immediate: false) }
                         ),
                         in: 1...100,
                         onEditingChanged: { editing in
                             if !editing {
-                                lamp.setBrightness(lamp.brightness, immediate: true)
+                                lamp.userSetBrightness(lamp.brightness, immediate: true)
                             }
                         }
                     )
@@ -113,10 +113,93 @@ struct LumenBarMenuView: View {
                 HStack(spacing: 6) {
                     ForEach([25, 50, 75, 100], id: \.self) { val in
                         Button("\(val)%") {
-                            lamp.setBrightness(Double(val), immediate: true)
+                            lamp.userSetBrightness(Double(val), immediate: true)
                         }
                         .buttonStyle(PresetPillStyle(isSelected: Int(round(lamp.brightness)) == val))
                     }
+                }
+            }
+            
+            Divider()
+            
+            // MARK: - AutoLight (Webcam)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label("AutoLight (Webcam)", systemImage: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(lamp.autoLight.isEnabled ? .yellow : .primary)
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $lamp.autoLight.isEnabled)
+                        .toggleStyle(.switch)
+                        .scaleEffect(0.8)
+                        .labelsHidden()
+                }
+                
+                if lamp.autoLight.isEnabled {
+                    VStack(spacing: 6) {
+                        HStack {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(lamp.autoLight.isCalibrating ? Color.orange : Color.green)
+                                    .frame(width: 6, height: 6)
+                                Text(lamp.autoLight.statusMessage)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button(action: {
+                                lamp.autoLight.calibrateCoupling()
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "slider.horizontal.below.rectangle")
+                                    Text("Étalonner")
+                                }
+                                .font(.system(size: 9, weight: .medium))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.06))
+                                .cornerRadius(4)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(lamp.autoLight.isCalibrating)
+                            .help("Mesure le couplage optique entre la lampe et la webcam pour éviter les boucles")
+                        }
+                        
+                        // Jauge de lumière ambiante externe estimée
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text("Lumière ambiante détectée")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("\(Int(round(lamp.autoLight.estimatedExternalLux))) %")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            ProgressView(value: lamp.autoLight.estimatedExternalLux, total: 100)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .yellow.opacity(0.8)))
+                                .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                        }
+                        
+                        // Curseur de confort souhaité
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text("Ambiance souhaitée")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("\(Int(round(lamp.autoLight.targetComfort))) %")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            Slider(value: $lamp.autoLight.targetComfort, in: 20...100)
+                        }
+                    }
+                    .padding(8)
+                    .background(Color.primary.opacity(0.04))
+                    .cornerRadius(6)
                 }
             }
             

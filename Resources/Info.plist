@@ -22,5 +22,7 @@
     <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Contrôle direct Bluetooth Low Energy de luminaires connectés (Inspire / Lexman).</string>
+    <key>NSCameraUsageDescription</key>
+    <string>AutoLight mesure la lumière ambiante via la webcam pour réguler automatiquement la luminosité de votre éclairage.</string>
 </dict>
 </plist>

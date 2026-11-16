@@ -16,6 +16,7 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 * 🚀 **Latence ultra-faible (< 30 ms)** : Démon Python d'arrière-plan maintenant une liaison BLE CoreBluetooth persistante et communiquant par socket UNIX avec l'interface.
 * 🖥️ **Application macOS Menu Bar native** : Développée en Swift & SwiftUI (`LSUIElement`), discrète dans la barre des menus, sans fenêtre flottante superflue.
 * 💡 **Gradateur & Allumage** : Contrôle continu de luminosité de 1% à 100% avec boutons de présélection instantanée (25%, 50%, 75%, 100%).
+* 👁️ **AutoLight par Webcam avec Découplage de Rétroaction** : Régulation adaptative selon la lumière ambiante naturelle, immunisée contre les boucles de rétroaction optique (Feed-Forward Cancellation $L_{\text{ext}} = L_{\text{mesuré}} - \alpha \cdot B$, étalonnage automatique de $\alpha$, bande morte $\pm 4\%$ et limitation de rampe $2.5\%$/s).
 * 🌡️ **Blanc variable CCT (2700K - 6500K)** : Régulation continue de la température de couleur (Chaud, Neutre, Froid).
 * 🎨 **Roue Chromatique 360°** : Prise en charge de la sélection de teinte exacte ou via palette de nuances directes.
 * 🔍 **Découverte & Appairage intégrés** : Scanner Bluetooth intégré dans l'application pour détecter, associer ou oublier un luminaire en un clic.
@@ -46,6 +47,20 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 │      Luminaire Connecté (Inspire / Lexman / ZBEK-27)   │
 └────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Régulation Adaptative AutoLight (Anti-Rétroaction)
+
+Quand une webcam pointe vers un bureau éclairé par la lampe, tout assombrissement externe induit une hausse de la lampe, laquelle renvoie du flux vers la caméra. Sans précaution, ce couplage engendre un pompage oscillatoire permanent ou une lutte avec l'exposition automatique (AEC) de la caméra.
+
+LumenBar résout ce problème avec une boucle de contrôle découplée :
+1. **Échantillonnage passif & confidentiel** : Prélèvement discret (1 trame toutes les 1.8s) via `AVFoundation` sous forme de matrice réduite en RAM (aucune vidéo ni photo n'est enregistrée).
+2. **Découplage Feed-Forward** : Soustraction de la contribution propre de la lampe :
+   $$L_{\text{externe}} = \max(0, L_{\text{mesuré}} - \alpha \cdot B_{\text{lampe}})$$
+3. **Auto-Étalonnage du coefficient $\alpha$** : Mesure in-situ du couplage optique par échelon test pour déduire le facteur $\alpha$ spécifique à la géométrie de la pièce.
+4. **Filtre passe-bas (EMA) & Bande morte ($\pm 4\%$)** : Les ombres fugaces (passage d'une main, mouvement de tête) sont filtrées.
+5. **Limitation de rampe douce** : Variation bornée à $\le 2.5\%$ par cycle, garantissant des transitions visuelles fluides et reposantes pour les yeux.
 
 ---
 
