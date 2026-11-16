@@ -139,6 +139,31 @@ struct LumenBarMenuView: View {
                 
                 if lamp.autoLight.isEnabled {
                     VStack(spacing: 6) {
+                        // Choix de la webcam (physique / virtuelle)
+                        HStack {
+                            Label("Webcam", systemImage: "video.fill")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if lamp.autoLight.availableCameras.isEmpty {
+                                Text("Aucune webcam")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Picker("", selection: $lamp.autoLight.selectedCameraID) {
+                                    ForEach(lamp.autoLight.availableCameras) { cam in
+                                        Text(cam.isVirtual ? "\(cam.name) (Virtuelle)" : cam.name)
+                                            .tag(cam.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                                .font(.system(size: 9))
+                            }
+                        }
+                        
+                        Divider()
+                        
                         HStack {
                             HStack(spacing: 4) {
                                 Circle()

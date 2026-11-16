@@ -5,6 +5,13 @@ import CoreVideo
 import ImageIO
 import Combine
 
+/// Représentation d'une caméra disponible (physique ou virtuelle)
+struct CameraDeviceItem: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let isVirtual: Bool
+}
+
 /// Moteur AutoLight : Régulation automatique de l'éclairage par webcam
 /// avec découplage de rétroaction optique (Feed-Forward Cancellation).
 class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -17,6 +24,19 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
                 start()
             } else {
                 stop()
+            }
+        }
+    }
+    
+    /// Caméras vidéo disponibles
+    @Published var availableCameras: [CameraDeviceItem] = []
+    
+    /// ID de la caméra sélectionnée
+    @Published var selectedCameraID: String = "" {
+        didSet {
+            if oldValue != selectedCameraID && !selectedCameraID.isEmpty {
+                switchCamera(to: selectedCameraID)
+                saveCameraPreference(selectedCameraID)
             }
         }
     }
@@ -71,10 +91,111 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     override init() {
         super.init()
         checkCameraAuthorization()
+        refreshAvailableCameras()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onDeviceNotification),
+            name: AVCaptureDevice.wasConnectedNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onDeviceNotification),
+            name: AVCaptureDevice.wasDisconnectedNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func onDeviceNotification() {
+        refreshAvailableCameras()
     }
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         stop()
+    }
+    
+    // MARK: - Gestion & Sélection Caméra
+    
+    private var configURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lumenbar_config.json")
+    }
+    
+    private func loadSavedCameraID() -> String? {
+        if let data = try? Data(contentsOf: configURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return json["camera_id"] as? String
+        }
+        return nil
+    }
+    
+    private func saveCameraPreference(_ id: String) {
+        var dict: [String: Any] = [:]
+        if let data = try? Data(contentsOf: configURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            dict = json
+        }
+        dict["camera_id"] = id
+        if let updated = try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted) {
+            try? updated.write(to: configURL)
+        }
+    }
+    
+    func refreshAvailableCameras() {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external],
+            mediaType: .video,
+            position: .unspecified
+        )
+        
+        let virtualKeywords = ["virtual", "obs", "iriun", "camo", "droidcam", "splitcam", "ndi", "loopback", "dummy"]
+        let list = discovery.devices.map { dev -> CameraDeviceItem in
+            let lower = dev.localizedName.lowercased()
+            let isVirt = virtualKeywords.contains { lower.contains($0) }
+            return CameraDeviceItem(id: dev.uniqueID, name: dev.localizedName, isVirtual: isVirt)
+        }
+        
+        DispatchQueue.main.async {
+            self.availableCameras = list
+            let saved = self.loadSavedCameraID()
+            
+            if let s = saved, list.contains(where: { $0.id == s }) {
+                if self.selectedCameraID != s {
+                    self.selectedCameraID = s
+                }
+            } else if self.selectedCameraID.isEmpty || !list.contains(where: { $0.id == self.selectedCameraID }) {
+                // Préférer la première caméra physique si possible
+                if let physical = list.first(where: { !$0.isVirtual }) {
+                    self.selectedCameraID = physical.id
+                } else if let first = list.first {
+                    self.selectedCameraID = first.id
+                }
+            }
+        }
+    }
+    
+    func switchCamera(to id: String) {
+        captureQueue.async { [weak self] in
+            guard let self = self else { return }
+            guard let device = AVCaptureDevice(uniqueID: id) else { return }
+            
+            self.captureSession.beginConfiguration()
+            if let currentInput = self.captureSession.inputs.first {
+                self.captureSession.removeInput(currentInput)
+            }
+            if let newInput = try? AVCaptureDeviceInput(device: device), self.captureSession.canAddInput(newInput) {
+                self.captureSession.addInput(newInput)
+            }
+            self.captureSession.commitConfiguration()
+            
+            DispatchQueue.main.async {
+                self.statusMessage = "Caméra : \(device.localizedName)"
+                if self.isEnabled {
+                    self.calibrateCoupling()
+                }
+            }
+        }
     }
     
     // MARK: - Autorisations Caméra
@@ -138,13 +259,20 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         captureSession.sessionPreset = .low // Très faible résolution pour économie CPU/GPU
         
         // Sélection de la webcam
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .external],
-            mediaType: .video,
-            position: .unspecified
-        )
+        var device: AVCaptureDevice? = nil
+        if !selectedCameraID.isEmpty {
+            device = AVCaptureDevice(uniqueID: selectedCameraID)
+        }
+        if device == nil {
+            let discovery = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInWideAngleCamera, .external],
+                mediaType: .video,
+                position: .unspecified
+            )
+            device = discovery.devices.first
+        }
         
-        guard let device = discovery.devices.first else {
+        guard let validDevice = device else {
             captureSession.commitConfiguration()
             DispatchQueue.main.async {
                 self.statusMessage = "Aucune webcam détectée"
@@ -156,7 +284,7 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         if let currentInput = captureSession.inputs.first {
             captureSession.removeInput(currentInput)
         }
-        if let input = try? AVCaptureDeviceInput(device: device), captureSession.canAddInput(input) {
+        if let input = try? AVCaptureDeviceInput(device: validDevice), captureSession.canAddInput(input) {
             captureSession.addInput(input)
         }
         
