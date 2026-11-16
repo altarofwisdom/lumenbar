@@ -135,7 +135,7 @@ struct L10n {
     static var autoPowerHelp: String { isFrench ? "Éteint automatiquement la lampe si la lumière du jour suffit, et la rallume dès que la pièce s'assombrit" : "Automatically turns off the lamp when daylight suffices, and wakes it when room gets darker" }
     static var autoLightActive: String { isFrench ? "AutoLight actif" : "AutoLight active" }
     static var autoLightInactive: String { isFrench ? "AutoLight inactif" : "AutoLight inactive" }
-    static var stableAmbiance: String { isFrench ? "Ambiance stable" : "Ambiance stable" }
+    static var stableAmbiance: String { isFrench ? "Ambiance stable" : "Lighting stable" }
     static var compensatingPlus: String { isFrench ? "Compensation (+)..." : "Compensating (+)..." }
     static var compensatingMinus: String { isFrench ? "Compensation (-)..." : "Compensating (-)..." }
     static var autoWakeMsg: String { isFrench ? "Allumage doux..." : "Soft wake-up..." }

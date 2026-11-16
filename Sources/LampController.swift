@@ -26,7 +26,7 @@ class LampController: ObservableObject {
     @Published var brightness: Double = 100
     @Published var temperature: Double = 2700
     @Published var hue: Double = 0
-    @Published var statusText: String = "Connexion..."
+    @Published var statusText: String = L10n.connecting
     
     // MARK: - Découverte & Gestion Dispositifs
     @Published var isScanning: Bool = false
@@ -370,7 +370,7 @@ class LampController: ObservableObject {
                 self.daemonProcess = p
             } catch {
                 DispatchQueue.main.async {
-                    self.statusText = "Erreur: \(error.localizedDescription)"
+                    self.statusText = L10n.isFrench ? "Erreur: \(error.localizedDescription)" : "Error: \(error.localizedDescription)"
                 }
                 return
             }
