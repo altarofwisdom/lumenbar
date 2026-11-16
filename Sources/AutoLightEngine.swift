@@ -305,24 +305,32 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     
     func calibrateCoupling() {
         guard !isCalibrating else { return }
-        isCalibrating = true
-        statusMessage = "Étalonnage optique..."
+        DispatchQueue.main.async {
+            self.isCalibrating = true
+            self.statusMessage = "Étalonnage en cours..."
+        }
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
+            defer {
+                DispatchQueue.main.async {
+                    self.isCalibrating = false
+                }
+            }
+            
             let initialLamp = self.getCurrentLampBrightness?() ?? 50.0
             // Attente de stabilisation
-            Thread.sleep(forTimeInterval: 0.8)
+            Thread.sleep(forTimeInterval: 0.6)
             let m0 = self.rawCameraLuma
             
-            // Appliquer un échelon de luminosité
-            let deltaB: Double = (initialLamp > 75.0) ? -20.0 : 20.0
+            // Appliquer un échelon de luminosité (+25% ou -25%)
+            let deltaB: Double = (initialLamp > 75.0) ? -25.0 : 25.0
             let testLamp = max(0.0, min(100.0, initialLamp + deltaB))
             self.applyLampBrightness?(testLamp)
             
-            // Attente réponse de la lampe et du capteur
-            Thread.sleep(forTimeInterval: 1.5)
+            // Attente réponse de la lampe et du capteur vidéo
+            Thread.sleep(forTimeInterval: 1.2)
             let m1 = self.rawCameraLuma
             
             // Calcul du ratio couplage α = |ΔM| / |ΔB|
@@ -335,11 +343,10 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
             
             // Rétablissement de la lampe
             self.applyLampBrightness?(initialLamp)
-            Thread.sleep(forTimeInterval: 0.5)
+            Thread.sleep(forTimeInterval: 0.4)
             
             DispatchQueue.main.async {
                 self.couplingAlpha = calculatedAlpha
-                self.isCalibrating = false
                 self.statusMessage = String(format: "Étalonné (α = %.2f)", calculatedAlpha)
             }
         }
@@ -348,14 +355,22 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard isEnabled, !isCalibrating else { return }
+        guard isEnabled else { return }
         
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastSampleTimestamp >= sampleInterval else { return }
+        let interval = isCalibrating ? 0.3 : sampleInterval
+        guard now - lastSampleTimestamp >= interval else { return }
         lastSampleTimestamp = now
         
         // 1. Calcul de la luminance de la scène (0 à 100)
         let measuredLuma = computeSceneLuma(sampleBuffer: sampleBuffer)
+        
+        DispatchQueue.main.async {
+            self.rawCameraLuma = measuredLuma
+        }
+        
+        // Pendant l'étalonnage, mesurer rawCameraLuma mais ne pas réguler la lampe
+        guard !isCalibrating else { return }
         
         // 2. Découplage de la contribution de la lampe (Soustraction feed-forward)
         let currentLamp = getCurrentLampBrightness?() ?? 50.0
@@ -366,7 +381,6 @@ class AutoLightEngine: NSObject, ObservableObject, AVCaptureVideoDataOutputSampl
         smoothedExternalLux = (emaFactor * smoothedExternalLux) + ((1.0 - emaFactor) * rawExternal)
         
         DispatchQueue.main.async {
-            self.rawCameraLuma = measuredLuma
             self.estimatedExternalLux = self.smoothedExternalLux
         }
         

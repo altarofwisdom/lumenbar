@@ -37,6 +37,7 @@ class LampController: ObservableObject {
     // MARK: - Moteur AutoLight (Webcam)
     @Published var autoLight = AutoLightEngine()
     
+    private var cancellables = Set<AnyCancellable>()
     private var daemonProcess: Process?
     private var healthCheckTimer: Timer?
     private var throttleWorkItem: DispatchWorkItem?
@@ -86,6 +87,14 @@ class LampController: ObservableObject {
                 self?.setBrightness(newB, immediate: true)
             }
         }
+        
+        // Propagation des changements AutoLight pour SwiftUI
+        autoLight.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
         
         if configuredAddress != nil {
             ensureDaemonRunning()
