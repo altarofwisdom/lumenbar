@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LumenBar</string>
+    <string name="connected">Connected</string>
+    <string name="connecting">Connecting…</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="scanning">Scanning…</string>
+    <string name="not_configured">No device paired</string>
+    <string name="scan_devices">Scan Devices</string>
+    <string name="pair">Pair</string>
+    <string name="forget_device">Forget Device</string>
+    <string name="nearby_devices">Nearby Devices</string>
+    <string name="no_devices_found">No compatible BLE lamp found</string>
+    <string name="permission_required">Bluetooth permissions are required to control the lamp</string>
+    
+    <!-- Controls -->
+    <string name="brightness">Brightness</string>
+    <string name="cct_white">CCT White</string>
+    <string name="color_hue">Color &amp; Hue</string>
+    <string name="warm_2700k">Warm 2700K</string>
+    <string name="neutral_4000k">Neutral 4000K</string>
+    <string name="cool_6500k">Cool 6500K</string>
+    
+    <!-- AutoLight -->
+    <string name="autolight_title">AutoLight (Lux Sensor)</string>
+    <string name="ambient_lux">Ambient Light</string>
+    <string name="target_comfort">Target Comfort</string>
+    <string name="auto_sleep_wake">Auto sleep &amp; wake</string>
+    <string name="lighting_stable">Lighting stable</string>
+    <string name="compensating_plus">Compensating (+)…</string>
+    <string name="compensating_minus">Compensating (-)…</string>
+    <string name="soft_wake">Soft wake-up…</string>
+    <string name="standby_daylight">Standby (Daylight sufficient)</string>
+    <string name="sensor_not_available">Hardware lux sensor unavailable</string>
+</resources>

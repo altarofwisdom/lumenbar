@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#121214</color>
+    <color name="surface_dark">#1E1E24</color>
+    <color name="surface_variant">#2A2A32</color>
+    <color name="primary">#FFD60A</color>
+    <color name="on_primary">#000000</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#9E9EA8</color>
+    <color name="accent_green">#34C759</color>
+    <color name="accent_red">#FF3B30</color>
+    <color name="accent_blue">#0A84FF</color>
+    
+    <!-- Presets de couleurs -->
+    <color name="preset_red">#FF3B30</color>
+    <color name="preset_orange">#FF9500</color>
+    <color name="preset_yellow">#FFCC00</color>
+    <color name="preset_green">#34C759</color>
+    <color name="preset_cyan">#5AC8FA</color>
+    <color name="preset_blue">#007AFF</color>
+    <color name="preset_purple">#AF52DE</color>
+    <color name="preset_pink">#FF2D55</color>
+</resources>

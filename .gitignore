@@ -14,3 +14,20 @@
 *.log
 *.sock
 .gdansk_config.json
+.lumenbar_config.json
+
+# Local configurations & secrets
+*.local
+*.local.*
+.env
+.env.*
+*.keystore
+*.jks
+
+# Android
+.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.gradle/
+*.apk

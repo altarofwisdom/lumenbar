@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LumenBar</string>
+    <string name="connected">Connecté</string>
+    <string name="connecting">Connexion…</string>
+    <string name="disconnected">Déconnecté</string>
+    <string name="scanning">Recherche en cours…</string>
+    <string name="not_configured">Aucun luminaire appairé</string>
+    <string name="scan_devices">Rechercher</string>
+    <string name="pair">Associer</string>
+    <string name="forget_device">Oublier le luminaire</string>
+    <string name="nearby_devices">Luminaires à proximité</string>
+    <string name="no_devices_found">Aucun luminaire BLE compatible détecté</string>
+    <string name="permission_required">Les autorisations Bluetooth sont requises pour piloter le luminaire</string>
+    
+    <!-- Contrôles -->
+    <string name="brightness">Luminosité</string>
+    <string name="cct_white">Blanc CCT</string>
+    <string name="color_hue">Couleur &amp; Teinte</string>
+    <string name="warm_2700k">Chaud 2700K</string>
+    <string name="neutral_4000k">Neutre 4000K</string>
+    <string name="cool_6500k">Froid 6500K</string>
+    
+    <!-- AutoLight -->
+    <string name="autolight_title">AutoLight (Capteur Lux)</string>
+    <string name="ambient_lux">Lumière ambiante</string>
+    <string name="target_comfort">Ambiance souhaitée</string>
+    <string name="auto_sleep_wake">Éteindre/rallumer auto</string>
+    <string name="lighting_stable">Ambiance stable</string>
+    <string name="compensating_plus">Compensation (+)…</string>
+    <string name="compensating_minus">Compensation (-)…</string>
+    <string name="soft_wake">Allumage doux…</string>
+    <string name="standby_daylight">Veille (Lumière naturelle suffisante)</string>
+    <string name="sensor_not_available">Capteur lux matériel non disponible</string>
+</resources>
