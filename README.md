@@ -1,11 +1,13 @@
 # LumenBar
 
-> **Direct Bluetooth Low Energy (BLE) controller and native macOS menu bar app for smart fixtures (Inspire / Lexman / GATT).**
+> **Direct Bluetooth Low Energy (BLE) controller and native applications for macOS (Menu Bar) & Android for smart fixtures (Inspire / Lexman / GATT).**
 
 **English** | [Français](README.fr.md)
 
 [![macOS](https://img.shields.io/badge/macOS-13.0+-black.svg?style=flat&logo=apple)](https://apple.com)
+[![Android](https://img.shields.io/badge/Android-8.0+_(API_26+)-3DDC84.svg?style=flat&logo=android&logoColor=white)](https://android.com)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-F05138.svg?style=flat&logo=swift)](https://swift.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=flat&logo=python)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -21,6 +23,7 @@ LumenBar provides instant, direct local control (no Zigbee bridge, no cloud gate
 
 * 🚀 **Ultra-low latency (< 30 ms)**: Background daemon maintaining a persistent CoreBluetooth link and communicating via UNIX domain socket.
 * 🖥️ **Native macOS Menu Bar App**: Built with Swift & SwiftUI (`LSUIElement`), unobtrusive in the status bar with no lingering windows.
+* 📱 **Native Android App**: Built with Kotlin and Material Components 3, direct and reactive BLE GATT control, ambient light sensor integration, no cloud, no account required.
 * 🌐 **Bilingual (English & French)**: Automatic macOS system language detection with in-app manual preference override.
 * 💡 **Dimming & Power**: Continuous brightness control from 0% to 100% with one-click quick presets (25%, 50%, 75%, 100%).
 * 👁️ **Closed-Loop AutoLight (Daylight Harvesting)**: Proportional closed-loop regulation based on standard LBNL / IES daylight harvesting principles, steering total desk illuminance toward your target comfort level.
@@ -146,6 +149,21 @@ No full Xcode installation is required. macOS Command Line Tools (`swiftc`) are 
 ```
 
 The script compiles the Swift sources and produces an ad-hoc signed app bundle in `~/Applications/LumenBar.app`.
+
+---
+
+## Building & Installing the Android App (APK)
+
+The Android app compiles via Gradle from the command line:
+
+```bash
+./android/build-apk.sh
+```
+
+The script produces a signed APK ready for direct sideloading:
+* `LumenBar.apk` (at repository root and in `android/`)
+
+An optional hook `android/post-build.local.sh` (ignored by Git) can be configured to automate distribution (e.g., via Telegram or `adb install`).
 
 ---
 

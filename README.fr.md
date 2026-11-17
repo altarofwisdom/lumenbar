@@ -1,11 +1,13 @@
 # LumenBar
 
-> **Contrôleur Bluetooth Low Energy (BLE) direct et application macOS Menu Bar pour luminaires connectés (Inspire / Lexman / GATT).**
+> **Contrôleur Bluetooth Low Energy (BLE) direct et applications natives macOS (Barre des menus) & Android pour luminaires connectés (Inspire / Lexman / GATT).**
 
 **Français** | [English](README.md)
 
 [![macOS](https://img.shields.io/badge/macOS-13.0+-black.svg?style=flat&logo=apple)](https://apple.com)
+[![Android](https://img.shields.io/badge/Android-8.0+_(API_26+)-3DDC84.svg?style=flat&logo=android&logoColor=white)](https://android.com)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-F05138.svg?style=flat&logo=swift)](https://swift.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=flat&logo=python)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -21,6 +23,7 @@ LumenBar permet de piloter instantanément et localement en direct (sans pont Zi
 
 * 🚀 **Latence ultra-faible (< 30 ms)** : Démon d'arrière-plan maintenant une liaison BLE CoreBluetooth persistante et communiquant par socket UNIX avec l'interface.
 * 🖥️ **Application macOS Menu Bar native** : Développée en Swift & SwiftUI (`LSUIElement`), discrète dans la barre des menus, sans fenêtre flottante superflue.
+* 📱 **Application Android native** : Développée en Kotlin avec Material Components 3, contrôle BLE GATT direct et réactif, gestion du capteur de lumière ambiante, sans compte, sans cloud ni service tiers.
 * 🌐 **Bilingue Français & Anglais** : Détection automatique de la langue système macOS et sélecteur manuel dans les préférences.
 * 💡 **Gradateur & Allumage** : Contrôle continu de luminosité de 0% à 100% avec boutons de présélection instantanée (25%, 50%, 75%, 100%).
 * 👁️ **Régulation AutoLight en Boucle Fermée (Daylight Harvesting)** : Asservissement inspiré des standards LBNL / IES régulant la luminosité totale perçue vers une consigne de confort.
@@ -146,6 +149,21 @@ L'application ne nécessite pas l'installation complète de Xcode : les Command 
 ```
 
 Le script compile les sources Swift et installe l'application signée ad-hoc dans `~/Applications/LumenBar.app`.
+
+---
+
+## Compilation & Installation de l'Application Android (APK)
+
+L'application Android se compile en ligne de commande via Gradle :
+
+```bash
+./android/build-apk.sh
+```
+
+Le script produit un APK signé pour le sideload direct :
+* `LumenBar.apk` (à la racine du projet et dans `android/`)
+
+Un hook optionnel `android/post-build.local.sh` (ignoré par Git) peut être configuré pour automatiser la distribution (par exemple via Telegram ou `adb install`).
 
 ---
 
